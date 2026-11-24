@@ -1,0 +1,6 @@
+PySide6
+mss
+imageio
+imageio-ffmpeg
+numpy
+Pillow
