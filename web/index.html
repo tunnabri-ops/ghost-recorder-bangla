@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<link rel="icon" href="data:," />
+<title>Ghost Recorder Bangla — বাংলা স্ক্রিন রেকর্ডার</title>
+<style>
+  :root{
+    --bg:#0a0e13; --bg2:#0d1219; --surface:#121922; --surface2:#171f2b; --surface3:#1c2735;
+    --border:#223041; --border-soft:#1a2635;
+    --text:#eef4f1; --muted:#9db0a3; --faint:#6b7f74;
+    --accent:#2ee6a8; --accent-dim:#123c2e; --accent-ink:#06231a;
+    --amber:#fbbf24; --red:#fb7185; --red-dim:#3d1620;
+    --sky:#38bdf8; --sky-dim:#0f2c3d;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  button,select,input{font-family:inherit}
+  button,select{min-height:40px}
+  a{color:var(--accent)}
+  .wrap{max-width:980px;margin:0 auto;padding:20px 16px 56px}
+
+  /* ---------- header ---------- */
+  .top{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+  .brand{display:flex;gap:14px;align-items:center;min-width:0}
+  .ghost{width:52px;height:52px;flex:0 0 52px;border-radius:14px;background:var(--accent-dim);border:1px solid #1d5c44;display:grid;place-items:center}
+  h1{font-size:clamp(24px,4.5vw,34px);line-height:1.15;margin:0;font-weight:700;letter-spacing:-.01em}
+  h1 .en{color:var(--accent)}
+  .tagline{margin:4px 0 0;color:var(--muted);font-size:15px;max-width:560px}
+  .live-stats{display:flex;gap:8px;flex-wrap:wrap}
+  .stat{background:var(--surface);border:1px solid var(--border-soft);border-radius:12px;padding:8px 14px;min-width:104px}
+  .stat b{display:block;font-size:17px;line-height:1.2}
+  .stat span{font-size:12.5px;color:var(--faint)}
+
+  /* ---------- cards & buttons ---------- */
+  .card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px}
+  .rec-card{background:linear-gradient(180deg,var(--surface2),var(--surface));border-color:var(--border)}
+  .btn{border:1px solid var(--border);background:var(--surface3);color:var(--text);border-radius:10px;padding:9px 18px;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+  .btn:hover{border-color:#33465e}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .btn.primary:hover{background:#4beebb}
+  .btn.ghostbtn{background:transparent}
+  .btn.small{min-height:36px;padding:5px 13px;font-size:13.5px;border-radius:8px}
+  .btn.danger{color:var(--red)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .err-msg{display:none;margin-top:12px;background:var(--red-dim);border:1px solid #5c2430;color:#fecdd3;border-radius:10px;padding:10px 14px;font-size:14px}
+  .err-msg.show{display:block}
+  .ok-msg{display:none;margin-top:12px;background:var(--accent-dim);border:1px solid #1d5c44;color:#a7f3d0;border-radius:10px;padding:10px 14px;font-size:14px}
+  .ok-msg.show{display:block}
+
+  /* ---------- recorder ---------- */
+  .rec-top{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .timer-box{text-align:right}
+  .timer{font-size:34px;font-weight:700;line-height:1.1}
+  .timer.rec{color:var(--red)}
+  .timer-label{font-size:13px;color:var(--faint)}
+  .rec-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--red);margin-right:7px;vertical-align:1px;animation:blink 1.2s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  @media (prefers-reduced-motion:reduce){.rec-dot{animation:none}}
+  .status-line{margin:12px 0 0;font-size:14px;color:var(--muted)}
+  .status-line b{color:var(--text)}
+  .opts{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:14.5px;color:var(--muted)}
+  .opts label{display:flex;gap:7px;align-items:center;cursor:pointer}
+  .opts input{accent-color:var(--accent);width:17px;height:17px}
+  .opts select{background:var(--surface);color:var(--text);border:1px solid var(--border-soft);border-radius:10px;padding:6px 10px;font-size:14px}
+  video{width:100%;border-radius:10px;background:#000;display:block}
+  .preview-wrap{margin-top:16px;display:none}
+  .preview-wrap.show{display:block}
+  .preview-wrap h3{margin:0 0 10px;font-size:16px}
+  .preview-meta{margin:10px 0 0;font-size:13.5px;color:var(--muted)}
+  .preview-meta b{color:var(--text)}
+  .shot-wrap{margin-top:16px;display:none}
+  .shot-wrap.show{display:block}
+  .shot-wrap h3{margin:0 0 10px;font-size:16px}
+  .shot-wrap img{max-width:100%;border-radius:10px;border:1px solid var(--border-soft);display:block}
+
+  /* ---------- history ---------- */
+  .hist-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .hist-item{display:flex;gap:10px;align-items:center;padding:10px 2px;border-top:1px solid var(--border-soft);font-size:14px;flex-wrap:wrap}
+  .hist-item .hn{flex:1;min-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hist-item .hs{color:var(--faint);font-size:12.5px;white-space:nowrap}
+  .hist-note{font-size:12.5px;color:var(--amber);flex-basis:100%}
+  .hist-empty{color:var(--faint);font-size:13.5px;margin:6px 0 0}
+
+  /* ---------- info grid ---------- */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:26px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}.stat{min-width:calc(50% - 4px);flex:1}.timer-box{text-align:left}}
+  .info h3{margin:0 0 8px;font-size:16px}
+  .info ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px}
+  .info li{margin-bottom:5px}
+  .info li b{color:var(--text)}
+  .foot{margin-top:26px;color:var(--faint);font-size:13.5px;text-align:center}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="brand">
+      <div class="ghost" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 3a7 7 0 0 0-7 7v9l2.3-2.2L9.6 19l2.4-2.3L14.4 19l2.3-2.2L19 19v-9a7 7 0 0 0-7-7Z" fill="#2ee6a8"/><circle cx="9.2" cy="10.5" r="1.4" fill="#06231a"/><circle cx="14.8" cy="10.5" r="1.4" fill="#06231a"/><path d="M12 13.2v3M10.4 14.8 12 16.4l1.6-1.6" stroke="#06231a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <h1>ঘোস্ট <span class="en">রেকর্ডার</span></h1>
+        <p class="tagline">স্ক্রিন, উইন্ডো বা ট্যাব রেকর্ড করুন আর স্ক্রিনশট নিন — পুরো বাংলা স্ক্রিন রেকর্ডার, সরাসরি ব্রাউজারেই। কোনো সার্ভারে কিছু ওঠে না।</p>
+      </div>
+    </div>
+    <div class="live-stats" aria-label="লাইভ পরিসংখ্যান">
+      <div class="stat"><b class="mono" id="statCount">০</b><span>রেকর্ডিং</span></div>
+      <div class="stat"><b class="mono" id="statShots">০</b><span>স্ক্রিনশট</span></div>
+      <div class="stat"><b class="mono" id="statSize">0 B</b><span>মোট সাইজ</span></div>
+    </div>
+  </div>
+
+  <!-- Recorder -->
+  <section class="card rec-card" aria-label="স্ক্রিন রেকর্ডার">
+    <div class="rec-top">
+      <div>
+        <h2 style="font-size:20px;margin:0;font-weight:700">🎥 স্ক্রিন রেকর্ড করুন</h2>
+        <p style="margin:6px 0 0;color:var(--muted);font-size:14px">“রেকর্ড শুরু করুন” চাপলে ব্রাউজার জিজ্ঞেস করবে — পুরো স্ক্রিন, একটা উইন্ডো, নাকি একটা ট্যাব রেকর্ড করবেন।</p>
+      </div>
+      <div class="timer-box">
+        <div class="timer mono" id="timer">০০:০০</div>
+        <div class="timer-label" id="timerLabel">রেকর্ডিং বন্ধ আছে</div>
+      </div>
+    </div>
+
+    <div class="opts">
+      <label><input type="checkbox" id="audioChk" checked /> সিস্টেম অডিওসহ রেকর্ড করুন <span style="color:var(--faint);font-size:12.5px">(যদি ব্রাউজার দেয়)</span></label>
+      <label>কোয়ালিটি
+        <select id="qualitySel" aria-label="রেকর্ডিং কোয়ালিটি">
+          <option value="high" selected>উচ্চ (সেরা)</option>
+          <option value="medium">মাঝারি</option>
+          <option value="low">কম (ছোট ফাইল)</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="startBtn" type="button">● রেকর্ড শুরু করুন</button>
+      <button class="btn" id="pauseBtn" type="button" disabled>⏸ Pause</button>
+      <button class="btn" id="resumeBtn" type="button" disabled>▶ Resume</button>
+      <button class="btn danger" id="stopBtn" type="button" disabled>■ Stop</button>
+      <button class="btn" id="shotBtn" type="button">📸 স্ক্রিনশট নিন</button>
+    </div>
+
+    <p class="status-line" id="statusLine">অবস্থা: <b>প্রস্তুত</b> — রেকর্ড শুরু করলে এখানে লাইভ প্রিভিউ দেখা যাবে।</p>
+    <div class="err-msg" id="errMsg" role="alert"></div>
+    <div class="ok-msg" id="okMsg" role="status"></div>
+
+    <div style="margin-top:16px">
+      <video id="livePreview" muted autoplay playsinline class="hidden" aria-label="লাইভ স্ক্রিন প্রিভিউ"></video>
+    </div>
+
+    <div class="preview-wrap" id="previewWrap">
+      <h3>▶️ শেষ রেকর্ডিং</h3>
+      <video id="recPreview" controls playsinline></video>
+      <p class="preview-meta" id="recMeta"></p>
+      <div class="actions">
+        <button class="btn primary" id="downloadBtn" type="button">⬇ ভিডিও ডাউনলোড করুন (.webm)</button>
+      </div>
+    </div>
+
+    <div class="shot-wrap" id="shotWrap">
+      <h3>📸 শেষ স্ক্রিনশট</h3>
+      <img id="shotImg" alt="স্ক্রিনশট প্রিভিউ" />
+      <p class="preview-meta" id="shotMeta"></p>
+      <div class="actions">
+        <button class="btn primary" id="shotDownloadBtn" type="button">⬇ স্ক্রিনশট ডাউনলোড করুন (.png)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- History -->
+  <section class="card" id="historyCard" style="margin-top:18px">
+    <div class="hist-head"><h2 style="font-size:18px">🕘 রেকর্ডিং হিস্ট্রি</h2><button class="btn small" id="clearHistBtn" type="button">সব মুছুন</button></div>
+    <div id="historyList"></div>
+    <p class="hist-empty" id="histEmpty">এখনো কোনো রেকর্ডিং বা স্ক্রিনশট নেই — রেকর্ড করলে এখানে জমা হবে।</p>
+    <p class="hist-empty" style="color:var(--amber)">সত্যিটা: ব্রাউজার স্টোরেজে ভিডিও ফাইল রাখা যায় না। তাই পুরনো রেকর্ডিংয়ের শুধু নাম, তারিখ, সাইজ আর সময়টুকুই সেভ থাকে — ফাইলটা ডাউনলোড করে রাখতে হয়। ছোট ফাইল (১.৫ MB-এর কম) হলে সেটা হিস্ট্রিতেই সেভ থাকে, আর এই সেশনে করা রেকর্ডিং এই ট্যাব খোলা থাকা পর্যন্ত আবার নামানো যায়।</p>
+  </section>
+
+  <!-- Info -->
+  <div class="grid">
+    <section class="card info">
+      <h3>✅ যা যা পারবে</h3>
+      <ul>
+        <li><b>পুরো স্ক্রিন / উইন্ডো / ট্যাব</b> — ব্রাউজারের শেয়ার পিকার থেকেই বেছে নিন</li>
+        <li><b>রিয়েল রেকর্ডিং</b> — MediaRecorder দিয়ে আসল WebM ভিডিও বানায়</li>
+        <li><b>Pause / Resume</b> — মাঝখানে থামিয়ে আবার চালু করা যায়</li>
+        <li><b>লাইভ টাইমার</b> — কতক্ষণ রেকর্ড হচ্ছে, সেকেন্ডে সেকেন্ডে দেখায়</li>
+        <li><b>স্ক্রিনশট</b> — রেকর্ড চলাকালীন বা একবারের ক্যাপচার থেকে PNG</li>
+        <li><b>প্রিভিউ + ডাউনলোড</b> — থামার পরেই ভিডিওটা দেখে .webm নামাতে পারবেন</li>
+        <li><b>হিস্ট্রি</b> — শেষ ৫০টা রেকর্ডিংয়ের তথ্য সেভ থাকে</li>
+      </ul>
+    </section>
+    <section class="card info">
+      <h3>⚠️ সত্যিকারের সীমা (Honest limits)</h3>
+      <ul>
+        <li><b>প্রতিবার অনুমতি লাগবে</b> — ব্রাউজার প্রত্যেকবার জিজ্ঞেস করবে কোন স্ক্রিন শেয়ার করবেন; অনুমতি না দিলে রেকর্ড হবে না।</li>
+        <li><b>সিস্টেম অডিও নির্ভর করে ব্রাউজার আর OS-এর ওপর</b> — Chrome-এ ট্যাবের অডিও সাধারণত আসে, পুরো স্ক্রিনের অডিও অনেক সময় আসে না; Firefox/Safari-তে সিস্টেম অডিও নাও আসতে পারে। অডিও না এলে ভিডিওটা নীরব হবে — এটা ব্রাউজারের সীমা।</li>
+        <li><b>শেয়ার বন্ধ করলেই রেকর্ড থামবে</b> — ব্রাউজারের “Stop sharing” চাপলে বা শেয়ার করা উইন্ডো বন্ধ করলে রেকর্ডিং নিজে থেকেই থেমে যাবে, আর এতটুকু পর্যন্ত যা হয়েছে সেটাই সেভ হবে।</li>
+        <li><b>আপনি না বাছলে কোনো রেকর্ডিং হয় না</b> — এই অ্যাপ নিজে থেকে কিছু রেকর্ড করে না; স্ক্রিন বাছার কাজটা আপনাকেই করতে হয়।</li>
+        <li>ভিডিও <b>WebM</b> ফরম্যাটে নামে — MP4 নয়; VLC, Chrome, Edge-এ সরাসরি চলে।</li>
+      </ul>
+    </section>
+  </div>
+
+  <p class="foot">রেকর্ডিং হয় আপনার নিজের ব্রাউজারেই — কোনো সার্ভারে ভিডিও ওঠে না। অন্যের স্ক্রিন বা ব্যক্তিগত তথ্য অনুমতি ছাড়া রেকর্ড করবেন না।</p>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- helpers ---------- */
+var BN=["০","১","২","৩","৪","৫","৬","৭","৮","৯"];
+function bnNum(n){ return String(n).replace(/[0-9]/g,function(d){ return BN[+d]; }); }
+function $(id){ return document.getElementById(id); }
+function fmtBytes(b){
+  if(b==null||isNaN(b)) return "—";
+  if(b===0) return "0 B";
+  var u=["B","KB","MB","GB"], i=Math.min(u.length-1,Math.floor(Math.log(b)/Math.log(1024)));
+  var v=b/Math.pow(1024,i);
+  return (v>=100?Math.round(v):v.toFixed(v>=10?1:2))+" "+u[i];
+}
+function fmtMMSS(totalSec){
+  totalSec=Math.max(0,Math.floor(totalSec));
+  var m=Math.floor(totalSec/60), s=totalSec%60;
+  return bnNum(String(m).padStart(2,"0"))+":"+bnNum(String(s).padStart(2,"0"));
+}
+function fmtDur(sec){
+  if(sec==null||isNaN(sec)) return "—";
+  sec=Math.round(sec);
+  if(sec<60) return bnNum(sec)+" সে.";
+  return bnNum(Math.floor(sec/60))+" মি. "+bnNum(sec%60)+" সে.";
+}
+function pickMime(){
+  var cands=[
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+    "video/mp4"
+  ];
+  for(var i=0;i<cands.length;i++){
+    try{ if(window.MediaRecorder && MediaRecorder.isTypeSupported(cands[i])) return cands[i]; }catch(e){}
+  }
+  return "";
+}
+function qualityBits(){
+  var q=$("qualitySel").value;
+  if(q==="low") return 800000;
+  if(q==="medium") return 2500000;
+  return 5000000;
+}
+function showErr(msg){
+  var el=$("errMsg"); el.textContent=msg; el.classList.add("show");
+  $("okMsg").classList.remove("show");
+}
+function showOk(msg){
+  var el=$("okMsg"); el.textContent=msg; el.classList.add("show");
+  $("errMsg").classList.remove("show");
+}
+function clearMsgs(){ $("errMsg").classList.remove("show"); $("okMsg").classList.remove("show"); }
+function setStatus(html){ $("statusLine").innerHTML="অবস্থা: "+html; }
+
+/* ---------- state ---------- */
+var stream=null, recorder=null, chunks=[];
+var recording=false, paused=false;
+var recStartAt=0, pausedTotal=0, pauseStartedAt=0, timerId=null;
+var lastBlob=null, lastBlobUrl=null, lastName="";
+var lastShotBlob=null, lastShotUrl=null, lastShotName="";
+var inSessionBlobs={}; /* history id -> object URL, এই ট্যাব খোলা থাকা পর্যন্ত */
+var counts={rec:0, shots:0, bytes:0};
+
+function supported(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+    showErr("এই ব্রাউজারে স্ক্রিন শেয়ার সাপোর্ট করে না। Chrome, Edge বা Firefox-এর নতুন সংস্করণ ব্যবহার করুন (Safari-তে আংশিক)।");
+    return false;
+  }
+  if(!window.MediaRecorder){
+    showErr("এই ব্রাউজারে MediaRecorder সাপোর্ট করে না। Chrome, Edge বা Firefox-এর নতুন সংস্করণ ব্যবহার করুন।");
+    return false;
+  }
+  return true;
+}
+
+/* ---------- timer ---------- */
+function elapsedSec(){
+  if(!recording) return 0;
+  var now=Date.now();
+  var base=paused ? (pauseStartedAt-recStartAt-pausedTotal) : (now-recStartAt-pausedTotal);
+  return base/1000;
+}
+function tickTimer(){
+  $("timer").textContent=fmtMMSS(elapsedSec());
+}
+function startTimer(){
+  stopTimer();
+  timerId=setInterval(tickTimer,500);
+  tickTimer();
+}
+function stopTimer(){
+  if(timerId){ clearInterval(timerId); timerId=null; }
+}
+
+/* ---------- recording ---------- */
+function setButtons(){
+  $("startBtn").disabled = recording;
+  $("pauseBtn").disabled = !recording || paused;
+  $("resumeBtn").disabled = !recording || !paused;
+  $("stopBtn").disabled = !recording;
+}
+
+function onTrackEnded(){
+  /* ব্যবহারকারী ব্রাউজারের “Stop sharing” চাপলে বা উইন্ডো বন্ধ করলে */
+  if(recording) finishRecording(true);
+}
+
+function startRecording(){
+  if(!supported()) return;
+  if(recording) return;
+  clearMsgs();
+  var wantAudio=$("audioChk").checked;
+  navigator.mediaDevices.getDisplayMedia({video:true, audio:wantAudio}).then(function(s){
+    stream=s;
+    var vtrack=s.getVideoTracks()[0];
+    if(vtrack) vtrack.addEventListener("ended", onTrackEnded);
+    var atrack=s.getAudioTracks()[0];
+    var live=$("livePreview");
+    live.srcObject=s; live.classList.remove("hidden");
+    live.play().catch(function(){});
+
+    var mime=pickMime();
+    var opts={};
+    if(mime) opts.mimeType=mime;
+    opts.videoBitsPerSecond=qualityBits();
+    try{
+      recorder=new MediaRecorder(s, opts);
+    }catch(e){
+      try{ recorder=new MediaRecorder(s); }
+      catch(e2){ showErr("রেকর্ডার চালু করা যায়নি: "+e2.message); stopStream(); return; }
+    }
+    chunks=[];
+    recorder.ondataavailable=function(ev){
+      if(ev.data && ev.data.size>0) chunks.push(ev.data);
+    };
+    recorder.onstop=function(){ onRecorderStopped(); };
+    recorder.onerror=function(ev){
+      showErr("রেকর্ডিংয়ে সমস্যা হয়েছে: "+(ev.error && ev.error.message ? ev.error.message : "অজানা সমস্যা"));
+    };
+    try{ recorder.start(250); }
+    catch(e){ showErr("রেকর্ড শুরু করা যায়নি: "+e.message); stopStream(); return; }
+
+    recording=true; paused=false;
+    recStartAt=Date.now(); pausedTotal=0; pauseStartedAt=0;
+    startTimer();
+    $("timer").classList.add("rec");
+    $("timerLabel").textContent="● রেকর্ড হচ্ছে";
+    setButtons();
+    setStatus("<b>রেকর্ড হচ্ছে</b>"+(atrack?" — সিস্টেম অডিওসহ":" — অডিও ছাড়া (এই শেয়ারে অডিও আসেনি)")+"। থামাতে Stop চাপুন, অথবা ব্রাউজারের শেয়ার বার থেকে বন্ধ করুন।");
+    if(wantAudio && !atrack){
+      showOk("সতর্কতা: সিস্টেম অডিও চাওয়া হয়েছিল, কিন্তু এই শেয়ারে অডিও ট্র্যাক আসেনি — ভিডিওটা নীরব হবে। ট্যাব শেয়ার করলে অডিও আসার সম্ভাবনা বেশি।");
+    }
+  }).catch(function(err){
+    if(err && err.name==="NotAllowedError"){
+      showErr("আপনি স্ক্রিন শেয়ারের অনুমতি দেননি — রেকর্ড শুরু হয়নি। আবার চেষ্টা করে স্ক্রিন বেছে নিন।");
+    }else if(err && err.name==="NotFoundError"){
+      showErr("শেয়ার করার মতো কোনো স্ক্রিন/উইন্ডো পাওয়া যায়নি।");
+    }else{
+      showErr("স্ক্রিন শেয়ার চালু করা যায়নি: "+(err && err.message ? err.message : err));
+    }
+  });
+}
+
+function pauseRecording(){
+  if(!recording || paused || !recorder) return;
+  try{ recorder.pause(); }catch(e){ showErr("Pause করা যায়নি: "+e.message); return; }
+  paused=true; pauseStartedAt=Date.now();
+  $("timerLabel").textContent="⏸ থামানো আছে";
+  setButtons();
+  setStatus("<b>রেকর্ড থামানো আছে</b> — Resume চাপলে আবার চলবে।");
+}
+function resumeRecording(){
+  if(!recording || !paused || !recorder) return;
+  try{ recorder.resume(); }catch(e){ showErr("Resume করা যায়নি: "+e.message); return; }
+  pausedTotal+=Date.now()-pauseStartedAt;
+  paused=false; pauseStartedAt=0;
+  $("timerLabel").textContent="● রেকর্ড হচ্ছে";
+  setButtons();
+  setStatus("<b>রেকর্ড হচ্ছে</b> — থামাতে Stop চাপুন।");
+}
+function stopRecording(){
+  finishRecording(false);
+}
+function finishRecording(fromTrackEnd){
+  if(!recording) return;
+  recording=false; paused=false;
+  stopTimer();
+  $("timer").classList.remove("rec");
+  $("timerLabel").textContent="থামানো হচ্ছে…";
+  setButtons();
+  if(recorder && recorder.state!=="inactive"){
+    try{ recorder.stop(); }catch(e){ onRecorderStopped(); }
+  }else{
+    onRecorderStopped();
+  }
+  if(fromTrackEnd) setStatus("<b>শেয়ার বন্ধ হয়ে গেছে</b> — রেকর্ডিং থেমেছে, ভিডিও তৈরি হচ্ছে…");
+}
+
+function onRecorderStopped(){
+  var dur=elapsedSec();
+  var blob=new Blob(chunks,{type:(recorder && recorder.mimeType) || "video/webm"});
+  var size=blob.size;
+  var d=new Date();
+  var name="ghost-recording-"+d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")+String(d.getSeconds()).padStart(2,"0")+".webm";
+  stopStream();
+  if(lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
+  lastBlob=blob; lastName=name; lastBlobUrl=URL.createObjectURL(blob);
+
+  var pv=$("recPreview");
+  pv.src=lastBlobUrl;
+  $("previewWrap").classList.add("show");
+  $("recMeta").innerHTML="ফাইল: <b>"+name+"</b> • সাইজ: <b>"+fmtBytes(size)+"</b> • সময়: <b>"+fmtDur(dur)+"</b> • ফরম্যাট: <b>WebM</b>";
+  $("timer").textContent=fmtMMSS(dur);
+  $("timerLabel").textContent="রেকর্ডিং শেষ";
+  setStatus("<b>রেকর্ডিং শেষ</b> — উপরে প্রিভিউ দেখুন, ডাউনলোড করুন।");
+  showOk("রেকর্ডিং সেভের জন্য তৈরি — “ভিডিও ডাউনলোড করুন” চাপলে .webm ফাইল নামবে।");
+
+  counts.rec++; counts.bytes+=size; refreshStats();
+  addHistory({
+    kind:"recording", name:name, date:Date.now(), size:size, duration:dur,
+    dataUrl:null, /* ছোট হলে addHistory-তে FileReader দিয়ে ভরা হয় */
+    blobUrl:lastBlobUrl
+  }, blob);
+  setButtons();
+}
+
+function stopStream(){
+  if(stream){
+    stream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
+    stream=null;
+  }
+  var live=$("livePreview");
+  live.srcObject=null; live.classList.add("hidden");
+}
+
+/* ---------- screenshot ---------- */
+function captureFrame(videoEl){
+  var w=videoEl.videoWidth, h=videoEl.videoHeight;
+  if(!w || !h) return null;
+  var c=document.createElement("canvas");
+  c.width=w; c.height=h;
+  var ctx=c.getContext("2d");
+  ctx.drawImage(videoEl,0,0,w,h);
+  return c;
+}
+function saveShot(canvas){
+  canvas.toBlob(function(blob){
+    if(!blob){ showErr("স্ক্রিনশট বানানো যায়নি — ভিডিও ফ্রেম এখনো তৈরি হয়নি, একটু পরে আবার চাপুন।"); return; }
+    if(lastShotUrl) URL.revokeObjectURL(lastShotUrl);
+    var d=new Date();
+    lastShotBlob=blob;
+    lastShotName="ghost-screenshot-"+d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")+String(d.getSeconds()).padStart(2,"0")+".png";
+    lastShotUrl=URL.createObjectURL(blob);
+    var img=$("shotImg");
+    img.src=lastShotUrl;
+    $("shotWrap").classList.add("show");
+    $("shotMeta").innerHTML="ফাইল: <b>"+lastShotName+"</b> • সাইজ: <b>"+fmtBytes(blob.size)+"</b> • রেজোলিউশন: <b>"+bnNum(canvas.width)+"×"+bnNum(canvas.height)+"</b>";
+    counts.shots++; counts.bytes+=blob.size; refreshStats();
+    addHistory({kind:"screenshot", name:lastShotName, date:Date.now(), size:blob.size, duration:null, blobUrl:lastShotUrl}, blob);
+    showOk("স্ক্রিনশট তৈরি — “স্ক্রিনশট ডাউনলোড করুন” চাপলে PNG নামবে।");
+  },"image/png");
+}
+function takeScreenshot(){
+  if(!supported()) return;
+  clearMsgs();
+  if(stream){
+    var live=$("livePreview");
+    if(live.videoWidth>0){
+      var c=captureFrame(live);
+      if(c){ saveShot(c); return; }
+    }
+    showErr("লাইভ প্রিভিউ এখনো তৈরি হয়নি — একটু অপেক্ষা করে আবার চাপুন।");
+    return;
+  }
+  /* রেকর্ড চলছে না — একবারের ক্যাপচার */
+  showOk("স্ক্রিনশটের জন্য একবার স্ক্রিন বাছুন — ছবি তোলার পর শেয়ার নিজে থেকেই বন্ধ হবে।");
+  navigator.mediaDevices.getDisplayMedia({video:true, audio:false}).then(function(s){
+    var v=document.createElement("video");
+    v.muted=true; v.srcObject=s;
+    v.play().then(function(){
+      setTimeout(function(){
+        var c=captureFrame(v);
+        s.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
+        if(c) saveShot(c);
+        else showErr("স্ক্রিনশট বানানো যায়নি — ভিডিও ফ্রেম তৈরি হয়নি।");
+      },300);
+    }).catch(function(){
+      s.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
+      showErr("স্ক্রিনশটের প্রিভিউ চালু করা যায়নি।");
+    });
+  }).catch(function(err){
+    if(err && err.name==="NotAllowedError") showErr("আপনি স্ক্রিন শেয়ারের অনুমতি দেননি — স্ক্রিনশট নেওয়া হয়নি।");
+    else showErr("স্ক্রিনশট নেওয়া যায়নি: "+(err && err.message ? err.message : err));
+  });
+}
+
+/* ---------- download ---------- */
+function downloadBlob(url, name){
+  var a=document.createElement("a");
+  a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ---------- history ---------- */
+var HIST_KEY="grb_history";
+function loadHistory(){
+  try{ return JSON.parse(localStorage.getItem(HIST_KEY)||"[]"); }catch(e){ return []; }
+}
+function saveHistoryList(h){
+  try{ localStorage.setItem(HIST_KEY, JSON.stringify(h)); }catch(e){
+    /* স্টোরেজ ভরে গেলে dataUrl ছাড়া আবার চেষ্টা */
+    try{
+      h.forEach(function(x){ delete x.dataUrl; });
+      localStorage.setItem(HIST_KEY, JSON.stringify(h));
+    }catch(e2){}
+  }
+}
+function addHistory(entry, blob){
+  var h=loadHistory();
+  entry.id="h"+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36);
+  if(blob && blob.size<=1500000){
+    var r=new FileReader();
+    r.onload=function(){
+      entry.dataUrl=r.result;
+      inSessionBlobs[entry.id]=entry.blobUrl||null;
+      var hh=loadHistory();
+      var found=hh.filter(function(x){ return x.id===entry.id; })[0];
+      if(found){ found.dataUrl=entry.dataUrl; saveHistoryList(hh); renderHistory(); }
+    };
+    r.readAsDataURL(blob);
+  }
+  if(entry.blobUrl) inSessionBlobs[entry.id]=entry.blobUrl;
+  h.unshift(entry);
+  h=h.slice(0,50);
+  saveHistoryList(h);
+  renderHistory();
+}
+function renderHistory(){
+  var list=$("historyList"); if(!list) return;
+  var h=loadHistory();
+  $("histEmpty").style.display=h.length?"none":"block";
+  list.innerHTML="";
+  h.forEach(function(item){
+    var div=document.createElement("div");
+    div.className="hist-item";
+    var d=new Date(item.date);
+    var icon=item.kind==="screenshot"?"📸":"🎥";
+    var nameEl=document.createElement("span"); nameEl.className="hn"; nameEl.textContent=icon+" "+item.name; nameEl.title=item.name;
+    var metaEl=document.createElement("span"); metaEl.className="hs";
+    metaEl.textContent=fmtBytes(item.size)+(item.duration!=null?" • "+fmtDur(item.duration):"")+" • "+d.toLocaleDateString("bn-BD")+" "+d.toLocaleTimeString("bn-BD",{hour:"2-digit",minute:"2-digit"});
+    div.appendChild(nameEl); div.appendChild(metaEl);
+    var canDownload=!!(inSessionBlobs[item.id] || item.dataUrl);
+    var btn=document.createElement("button");
+    btn.type="button"; btn.className="btn small"; btn.textContent=canDownload?"⬇ আবার নামান":"আবার নামানো যাবে না";
+    btn.disabled=!canDownload;
+    btn.addEventListener("click",function(){
+      var url=inSessionBlobs[item.id] || item.dataUrl;
+      if(url) downloadBlob(url, item.name);
+    });
+    div.appendChild(btn);
+    if(!canDownload){
+      var note=document.createElement("span"); note.className="hist-note";
+      note.textContent="ফাইলটি আগেই ডাউনলোড করা হয়েছে — ব্রাউজার স্টোরেজে ভিডিও রাখা যায় না, তাই এখান থেকে আবার নামানো যাবে না। নতুন করে রেকর্ড করুন।";
+      div.appendChild(note);
+    }
+    list.appendChild(div);
+  });
+}
+
+/* ---------- stats ---------- */
+function refreshStats(){
+  $("statCount").textContent=bnNum(counts.rec);
+  $("statShots").textContent=bnNum(counts.shots);
+  $("statSize").textContent=fmtBytes(counts.bytes);
+}
+
+/* ---------- wiring ---------- */
+$("startBtn").addEventListener("click", startRecording);
+$("pauseBtn").addEventListener("click", pauseRecording);
+$("resumeBtn").addEventListener("click", resumeRecording);
+$("stopBtn").addEventListener("click", stopRecording);
+$("shotBtn").addEventListener("click", takeScreenshot);
+$("downloadBtn").addEventListener("click", function(){
+  if(lastBlobUrl) downloadBlob(lastBlobUrl, lastName);
+});
+$("shotDownloadBtn").addEventListener("click", function(){
+  if(lastShotUrl) downloadBlob(lastShotUrl, lastShotName);
+});
+$("clearHistBtn").addEventListener("click", function(){
+  try{ localStorage.removeItem(HIST_KEY); }catch(e){}
+  Object.keys(inSessionBlobs).forEach(function(k){ delete inSessionBlobs[k]; });
+  renderHistory();
+});
+window.addEventListener("beforeunload", function(){
+  if(recording && recorder && recorder.state!=="inactive"){ try{ recorder.stop(); }catch(e){} }
+});
+
+renderHistory();
+refreshStats();
+setButtons();
+})();
+</script>
+</body>
+</html>
