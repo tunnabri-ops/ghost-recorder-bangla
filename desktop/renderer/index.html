@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Recorder Bangla — স্ক্রিন রেকর্ডার</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="ghost" aria-hidden="true">👻</span>
+    <div>
+      <h1>Ghost Recorder Bangla</h1>
+      <p>স্ক্রিন রেকর্ডার + স্ক্রিনশট &nbsp;·&nbsp; <span id="appVersion">v1.0.0</span></p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button id="btnUpdate" class="btn ghost-btn" type="button">আপডেট দেখুন</button>
+    <button id="btnTray" class="btn ghost-btn" type="button" title="ট্রেতে লুকান">ট্রেতে লুকান</button>
+    <button id="btnQuit" class="btn ghost-btn danger" type="button">বন্ধ করুন</button>
+  </div>
+</header>
+
+<div id="updateBanner" class="update-banner hidden">
+  <span>🎉 নতুন ভার্সন এসেছে: <strong id="updateVersion"></strong> — আপনার ভার্সন <span id="currentVersion"></span></span>
+  <button id="btnDownloadUpdate" class="btn primary small" type="button">ডাউনলোড করুন</button>
+  <button id="btnDismissUpdate" class="btn ghost-btn small" type="button">পরে</button>
+</div>
+
+<main class="layout">
+  <section class="panel sources-panel">
+    <div class="panel-head">
+      <h2>১. সোর্স বেছে নিন</h2>
+      <button id="btnRefreshSources" class="btn ghost-btn small" type="button">রিফ্রেশ</button>
+    </div>
+    <p class="hint">স্ক্রিন বা যেকোনো উইন্ডো বেছে নিন — তারপর প্রিভিউ দেখা যাবে।</p>
+    <div id="sourceList" class="source-list">
+      <p class="empty">সোর্স লোড হচ্ছে…</p>
+    </div>
+  </section>
+
+  <section class="panel record-panel">
+    <h2>২. রেকর্ড করুন</h2>
+    <div class="preview-wrap">
+      <video id="preview" autoplay muted playsinline></video>
+      <div id="previewEmpty" class="preview-empty">প্রিভিউ এখানে দেখা যাবে — প্রথমে একটি সোর্স বেছে নিন</div>
+      <div id="recBadge" class="rec-badge hidden">● REC <span id="timer">00:00</span></div>
+    </div>
+    <div class="timer-row">
+      <span>সময়: <strong id="timerBig">00:00</strong></span>
+      <span id="statusText" class="status">প্রস্তুত</span>
+    </div>
+    <div class="controls">
+      <button id="btnRecord" class="btn record" type="button" disabled>● রেকর্ড</button>
+      <button id="btnPause" class="btn" type="button" disabled>⏸ বিরতি</button>
+      <button id="btnResume" class="btn hidden" type="button" disabled>▶ আবার শুরু</button>
+      <button id="btnStop" class="btn stop" type="button" disabled>■ থামান</button>
+      <button id="btnScreenshot" class="btn" type="button" disabled>📸 স্ক্রিনশট</button>
+    </div>
+    <p class="hint">রেকর্ড থামালে WebM ফাইল সেভ করার উইন্ডো আসবে। স্ক্রিনশট PNG হিসেবে সেভ হয়।</p>
+  </section>
+
+  <section class="panel history-panel">
+    <div class="panel-head">
+      <h2>৩. হিস্টোরি</h2>
+      <span id="historyCount" class="count">০টি</span>
+    </div>
+    <input id="historySearch" type="search" placeholder="ফাইলের নাম দিয়ে খুঁজুন…" aria-label="হিস্টোরি খুঁজুন">
+    <ul id="historyList" class="history-list">
+      <li class="empty">এখনো কিছু সেভ হয়নি — এই সেশনে সেভ করা রেকর্ডিং ও স্ক্রিনশট এখানে দেখা যাবে।</li>
+    </ul>
+    <p class="hint">হিস্টোরি শুধু এই সেশনের — অ্যাপ বন্ধ করলে মুছে যাবে, ফাইল আপনার কম্পিউটারে থাকবে।</p>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>Ghost Recorder Bangla · ফ্রি ও ওপেন সোর্স</span>
+  <span id="updateStatus" class="muted"></span>
+</footer>
+
+<script src="renderer.js"></script>
+</body>
+</html>
