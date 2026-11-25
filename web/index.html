@@ -81,6 +81,26 @@
   .shot-wrap h3{margin:0 0 10px;font-size:16px}
   .shot-wrap img{max-width:100%;border-radius:10px;border:1px solid var(--border-soft);display:block}
 
+  /* ---------- webcam overlay ---------- */
+  #compositePreview{width:100%;border-radius:10px;background:#000;display:block}
+  .cam-note{font-size:12.5px;color:var(--faint)}
+
+  /* ---------- annotation editor ---------- */
+  .annotate-wrap{margin-top:16px;display:none;border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:var(--surface2)}
+  .annotate-wrap.show{display:block}
+  .annotate-wrap h3{margin:0 0 10px;font-size:16px}
+  .annotate-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .annotate-tools .tool-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .annotate-tools input[type="color"]{width:44px;height:36px;padding:2px;background:var(--surface);border:1px solid var(--border-soft);border-radius:8px;cursor:pointer}
+  .annotate-tools input[type="range"]{accent-color:var(--accent)}
+  #annotateCanvas{max-width:100%;border-radius:10px;border:1px solid var(--border-soft);display:block;background:#000;cursor:crosshair;touch-action:none}
+
+  /* ---------- scheduled recording ---------- */
+  .sched-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .sched-row input[type="time"],.sched-row input[type="number"]{background:var(--surface);color:var(--text);border:1px solid var(--border-soft);border-radius:10px;padding:8px 10px;font-size:14px;min-height:40px}
+  .sched-row label{display:flex;gap:7px;align-items:center;cursor:pointer}
+  .sched-row input{accent-color:var(--accent);width:17px;height:17px}
+
   /* ---------- history ---------- */
   .hist-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
   .hist-item{display:flex;gap:10px;align-items:center;padding:10px 2px;border-top:1px solid var(--border-soft);font-size:14px;flex-wrap:wrap}
@@ -144,6 +164,19 @@
       </label>
     </div>
 
+    <div class="opts">
+      <label><input type="checkbox" id="camChk" /> 📷 ওয়েবক্যাম ওভারলে — মুখের ছোট ছবি কোণায় বসবে</label>
+      <label>কোণা
+        <select id="camCorner" aria-label="ওয়েবক্যাম কোণা">
+          <option value="bottom-right" selected>নিচে ডানে</option>
+          <option value="bottom-left">নিচে বামে</option>
+          <option value="top-right">উপরে ডানে</option>
+          <option value="top-left">উপরে বামে</option>
+        </select>
+      </label>
+      <span class="cam-note" id="camNote">ক্যামেরার অনুমতি চাইলে দিতে হবে; না দিলে ওভারলে ছাড়াই রেকর্ড হবে।</span>
+    </div>
+
     <div class="actions">
       <button class="btn primary" id="startBtn" type="button">● রেকর্ড শুরু করুন</button>
       <button class="btn" id="pauseBtn" type="button" disabled>⏸ Pause</button>
@@ -158,6 +191,7 @@
 
     <div style="margin-top:16px">
       <video id="livePreview" muted autoplay playsinline class="hidden" aria-label="লাইভ স্ক্রিন প্রিভিউ"></video>
+      <canvas id="compositePreview" class="hidden" aria-label="লাইভ প্রিভিউ — ওয়েবক্যাম ওভারলেসহ"></canvas>
     </div>
 
     <div class="preview-wrap" id="previewWrap">
@@ -166,7 +200,9 @@
       <p class="preview-meta" id="recMeta"></p>
       <div class="actions">
         <button class="btn primary" id="downloadBtn" type="button">⬇ ভিডিও ডাউনলোড করুন (.webm)</button>
+        <button class="btn" id="gifBtn" type="button">🎞 GIF ডাউনলোড করুন</button>
       </div>
+      <p class="preview-meta" id="gifMeta" style="display:none"></p>
     </div>
 
     <div class="shot-wrap" id="shotWrap">
@@ -175,8 +211,41 @@
       <p class="preview-meta" id="shotMeta"></p>
       <div class="actions">
         <button class="btn primary" id="shotDownloadBtn" type="button">⬇ স্ক্রিনশট ডাউনলোড করুন (.png)</button>
+        <button class="btn" id="annotateBtn" type="button">✏️ আঁকুন / তীর / টেক্সট যোগ করুন</button>
       </div>
     </div>
+
+    <div class="annotate-wrap" id="annotateWrap">
+      <h3>✏️ স্ক্রিনশট এডিট করুন</h3>
+      <div class="annotate-tools">
+        <button class="btn small tool-btn active" id="toolPen" type="button">✏️ কলম</button>
+        <button class="btn small tool-btn" id="toolArrow" type="button">➡️ তীর</button>
+        <button class="btn small tool-btn" id="toolText" type="button">🔤 টেক্সট</button>
+        <input type="color" id="annColor" value="#ff0000" aria-label="রং" />
+        <label style="font-size:13.5px">মোটা <input type="range" id="annWidth" min="1" max="12" value="3" aria-label="লাইনের মোটা" /></label>
+        <button class="btn small" id="annUndo" type="button">↩ Undo</button>
+        <button class="btn small" id="annClear" type="button">মুছুন</button>
+      </div>
+      <canvas id="annotateCanvas"></canvas>
+      <p class="preview-meta">কলম/তীর: টেনে আঁকুন। টেক্সট: ছবিতে ক্লিক করে লিখুন। সেভ করলে এডিট করা ছবিটাই PNG হবে।</p>
+      <div class="actions">
+        <button class="btn primary" id="annSave" type="button">✅ এডিট করা ছবি সেভ করুন</button>
+        <button class="btn ghostbtn" id="annCancel" type="button">বাতিল</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scheduled recording -->
+  <section class="card" style="margin-top:18px" aria-label="নির্ধারিত রেকর্ডিং">
+    <h2 style="font-size:18px;margin:0">⏰ নির্ধারিত রেকর্ডিং</h2>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:14px">নির্ধারিত সময়ে রেকর্ডিং নিজে থেকে শুরু হবে। <b>সত্যিটা: এই পাতা খোলা থাকলেই চলবে</b> — পাতা বন্ধ করলে সময়সূচি কাজ করবে না। নির্ধারিত সময়ে ব্রাউজার স্ক্রিন বাছার উইন্ডো দেখাবে, সেটা আপনাকেই বেছে নিতে হবে (ব্রাউজার অনুমতি ছাড়া নিজে রেকর্ড করতে দেয় না)।</p>
+    <div class="sched-row">
+      <label>সময় <input type="time" id="schedTime" value="09:00" /></label>
+      <label>সময়কাল (মিনিট, ০ = নিজে থামাবেন) <input type="number" id="schedDur" min="0" max="480" value="5" style="width:80px" /></label>
+      <label><input type="checkbox" id="schedEnable" /> চালু করুন</label>
+      <button class="btn small" id="schedSaveBtn" type="button">সংরক্ষণ করুন</button>
+    </div>
+    <p class="preview-meta" id="schedStatus">নির্ধারিত রেকর্ডিং বন্ধ আছে।</p>
   </section>
 
   <!-- History -->
@@ -197,6 +266,10 @@
         <li><b>Pause / Resume</b> — মাঝখানে থামিয়ে আবার চালু করা যায়</li>
         <li><b>লাইভ টাইমার</b> — কতক্ষণ রেকর্ড হচ্ছে, সেকেন্ডে সেকেন্ডে দেখায়</li>
         <li><b>স্ক্রিনশট</b> — রেকর্ড চলাকালীন বা একবারের ক্যাপচার থেকে PNG</li>
+        <li><b>ওয়েবক্যাম ওভারলে (v1.1.0)</b> — মুখের ছোট ছবি রেকর্ডিংয়ের কোণায় বসে; কোণা বদলানো যায়</li>
+        <li><b>স্ক্রিনশট এডিট (v1.1.0)</b> — কলম, তীর, টেক্সট দিয়ে আঁকুন, তারপর PNG সেভ করুন</li>
+        <li><b>GIF এক্সপোর্ট (v1.1.0)</b> — শেষ রেকর্ডিং থেকে অ্যানিমেটেড GIF বানান (ব্রাউজারেই)</li>
+        <li><b>নির্ধারিত রেকর্ডিং (v1.1.0)</b> — ঠিক সময়ে রেকর্ড শুরু হয় (এই পাতা খোলা থাকলে)</li>
         <li><b>প্রিভিউ + ডাউনলোড</b> — থামার পরেই ভিডিওটা দেখে .webm নামাতে পারবেন</li>
         <li><b>হিস্ট্রি</b> — শেষ ৫০টা রেকর্ডিংয়ের তথ্য সেভ থাকে</li>
       </ul>
@@ -213,10 +286,89 @@
     </section>
   </div>
 
-  <p class="foot">রেকর্ডিং হয় আপনার নিজের ব্রাউজারেই — কোনো সার্ভারে ভিডিও ওঠে না। অন্যের স্ক্রিন বা ব্যক্তিগত তথ্য অনুমতি ছাড়া রেকর্ড করবেন না।</p>
+  <p class="foot">রেকর্ডিং হয় আপনার নিজের ব্রাউজারেই — কোনো সার্ভারে ভিডিও ওঠে না। অন্যের স্ক্রিন বা ব্যক্তিগত তথ্য অনুমতি ছাড়া রেকর্ড করবেন না। · v1.1.0</p>
 </div>
 
 <script>
+/* GIFENC-START */
+/* Minimal animated-GIF encoder (GIF89a, LZW) — no library needed.
+ * Frames are RGBA pixel arrays; colours are mapped to a fixed 216-colour
+ * web-safe palette. Returns a Uint8Array with the full .gif file.
+ * Kept outside the app IIFE so it can be unit-tested under Node. */
+function encodeGIF(frames, width, height, delayCs) {
+  var palette = [];
+  var r, g, b, i, j;
+  for (r = 0; r < 6; r++) for (g = 0; g < 6; g++) for (b = 0; b < 6; b++)
+    palette.push([r * 51, g * 51, b * 51]);
+  while (palette.length < 256) palette.push([0, 0, 0]);
+  var out = [];
+  function byte(v) { out.push(v & 255); }
+  function str(s) { for (var k = 0; k < s.length; k++) byte(s.charCodeAt(k)); }
+  function word(v) { byte(v); byte(v >> 8); }
+  str("GIF89a");
+  word(width); word(height);
+  byte(0xF7); /* global colour table, 8-bit, 256 entries */
+  byte(0); byte(0);
+  for (i = 0; i < 256; i++) { byte(palette[i][0]); byte(palette[i][1]); byte(palette[i][2]); }
+  /* Loop forever (Netscape extension). */
+  byte(0x21); byte(0xFF); byte(11); str("NETSCAPE2.0"); byte(3); byte(1); word(0); byte(0);
+  frames.forEach(function (frame) {
+    byte(0x21); byte(0xF9); byte(4); byte(0); word(delayCs); byte(0); byte(0);
+    byte(0x2C); word(0); word(0); word(width); word(height); byte(0);
+    var indices = new Uint8Array(width * height);
+    for (var p = 0; p < width * height; p++) {
+      var r6 = Math.min(5, Math.round(frame[p * 4] / 51));
+      var g6 = Math.min(5, Math.round(frame[p * 4 + 1] / 51));
+      var b6 = Math.min(5, Math.round(frame[p * 4 + 2] / 51));
+      indices[p] = r6 * 36 + g6 * 6 + b6;
+    }
+    byte(8); /* LZW minimum code size */
+    lzwEncode(indices);
+  });
+  byte(0x3B);
+  function lzwEncode(indices) {
+    var clearCode = 256, eoi = 257, nextCode = 258, codeSize = 9;
+    var dict = new Map();
+    var bitBytes = [], bitBuf = 0, bitCnt = 0;
+    function emit(code, size) {
+      bitBuf |= code << bitCnt; bitCnt += size;
+      while (bitCnt >= 8) { bitBytes.push(bitBuf & 255); bitBuf >>= 8; bitCnt -= 8; }
+    }
+    emit(clearCode, codeSize);
+    var prefix = indices[0];
+    for (var n = 1; n < indices.length; n++) {
+      var k = indices[n];
+      var key = prefix * 256 + k;
+      if (dict.has(key)) { prefix = dict.get(key); }
+      else {
+        emit(prefix, codeSize);
+        dict.set(key, nextCode++);
+        /* Grow the code size only when the next free code EXCEEDS what
+         * the current size can hold — the decoder grows at the same
+         * point; growing at == would switch one code too early and
+         * corrupt the stream. */
+        if (nextCode === (1 << codeSize) + 1 && codeSize < 12) codeSize++;
+        if (nextCode > 4095) {
+          emit(clearCode, codeSize);
+          dict.clear(); nextCode = 258; codeSize = 9;
+        }
+        prefix = k;
+      }
+    }
+    emit(prefix, codeSize);
+    emit(eoi, codeSize);
+    if (bitCnt > 0) bitBytes.push(bitBuf & 255);
+    for (var off = 0; off < bitBytes.length; off += 255) {
+      var chunk = bitBytes.slice(off, off + 255);
+      byte(chunk.length);
+      for (j = 0; j < chunk.length; j++) byte(chunk[j]);
+    }
+    byte(0);
+  }
+  return new Uint8Array(out);
+}
+/* GIFENC-END */
+
 (function(){
 "use strict";
 
@@ -279,8 +431,101 @@ var recording=false, paused=false;
 var recStartAt=0, pausedTotal=0, pauseStartedAt=0, timerId=null;
 var lastBlob=null, lastBlobUrl=null, lastName="";
 var lastShotBlob=null, lastShotUrl=null, lastShotName="";
+var lastShotCanvas=null; /* v1.1.0: kept for the annotation editor */
 var inSessionBlobs={}; /* history id -> object URL, এই ট্যাব খোলা থাকা পর্যন্ত */
 var counts={rec:0, shots:0, bytes:0};
+
+/* ---------- v1.1.0: webcam overlay ---------- */
+var camStream=null, camVideo=null, compositeCanvas=null, compositeCtx=null;
+var compositeRAF=0, compositeStream=null, camFailed=false;
+function camCornerXY(w,h,cw,ch){
+  var m=12, corner=$("camCorner").value;
+  if(corner==="top-left") return [m,m];
+  if(corner==="top-right") return [w-cw-m,m];
+  if(corner==="bottom-left") return [m,h-ch-m];
+  return [w-cw-m,h-ch-m]; /* bottom-right */
+}
+function drawComposite(){
+  var live=$("livePreview");
+  if(!live.videoWidth || !compositeCanvas) return;
+  if(compositeCanvas.width!==live.videoWidth || compositeCanvas.height!==live.videoHeight){
+    compositeCanvas.width=live.videoWidth;
+    compositeCanvas.height=live.videoHeight;
+  }
+  var ctx=compositeCtx, w=compositeCanvas.width, h=compositeCanvas.height;
+  ctx.drawImage(live,0,0,w,h);
+  if(camVideo && camVideo.videoWidth>0){
+    var cw=Math.round(w*0.25), ch=Math.round(cw*camVideo.videoHeight/camVideo.videoWidth);
+    if(ch>Math.round(h*0.5)){ ch=Math.round(h*0.5); cw=Math.round(ch*camVideo.videoWidth/camVideo.videoHeight); }
+    var xy=camCornerXY(w,h,cw,ch);
+    ctx.drawImage(camVideo,xy[0],xy[1],cw,ch);
+    ctx.strokeStyle="#fff"; ctx.lineWidth=3;
+    ctx.strokeRect(xy[0]-2,xy[1]-2,cw+4,ch+4);
+  }
+}
+function compositeLoop(){
+  drawComposite();
+  compositeRAF=requestAnimationFrame(compositeLoop);
+}
+function startComposite(){
+  compositeCanvas=$("compositePreview");
+  compositeCtx=compositeCanvas.getContext("2d");
+  compositeCanvas.classList.remove("hidden");
+  $("livePreview").classList.add("hidden");
+  compositeStream=compositeCanvas.captureStream(30);
+  if(stream){ /* keep the display audio on the recorded stream */
+    stream.getAudioTracks().forEach(function(t){ compositeStream.addTrack(t); });
+  }
+  compositeLoop();
+}
+function stopComposite(){
+  if(compositeRAF) cancelAnimationFrame(compositeRAF);
+  compositeRAF=0;
+  if(compositeCanvas) compositeCanvas.classList.add("hidden");
+  if(camStream){ camStream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} }); camStream=null; }
+  camVideo=null; compositeStream=null; compositeCanvas=null; compositeCtx=null;
+}
+
+/* ---------- v1.1.0: scheduled recording ---------- */
+var SCHED_KEY="grb_schedule";
+function loadSchedule(){
+  try{ return JSON.parse(localStorage.getItem(SCHED_KEY)||"null") || {time:"09:00",duration:5,enabled:false,firedDate:null}; }
+  catch(e){ return {time:"09:00",duration:5,enabled:false,firedDate:null}; }
+}
+function saveSchedule(s){
+  try{ localStorage.setItem(SCHED_KEY, JSON.stringify(s)); }catch(e){}
+}
+function refreshSchedStatus(){
+  var s=loadSchedule();
+  var el=$("schedStatus");
+  if(!s.enabled){ el.textContent="নির্ধারিত রেকর্ডিং বন্ধ আছে।"; return; }
+  var now=new Date();
+  var parts=s.time.split(":");
+  var target=new Date(now); target.setHours(+parts[0],+parts[1],0,0);
+  if(target<=now) target.setDate(target.getDate()+1);
+  var diff=Math.max(0,Math.round((target-now)/1000));
+  var hh=Math.floor(diff/3600), mm=Math.floor(diff%3600/60), ss=diff%60;
+  el.textContent="পরের রেকর্ডিং: "+bnNum(s.time)+" — আর "+bnNum(hh)+" ঘণ্টা "+bnNum(mm)+" মিনিট "+bnNum(ss)+" সেকেন্ড বাকি"
+    +(s.duration>0?" (সময়কাল "+bnNum(s.duration)+" মিনিট)":" (নিজে থামাতে হবে)")
+    +" — এই পাতা খোলা থাকলেই চলবে।";
+}
+function checkSchedule(){
+  refreshSchedStatus();
+  if(recording) return;
+  var s=loadSchedule();
+  if(!s.enabled) return;
+  var now=new Date();
+  var today=now.toISOString().slice(0,10);
+  if(s.firedDate===today) return;
+  var parts=s.time.split(":");
+  var target=new Date(now); target.setHours(+parts[0],+parts[1],0,0);
+  if(target<=now && now-target<90000){
+    s.firedDate=today; saveSchedule(s);
+    showOk("⏰ নির্ধারিত সময় — রেকর্ডিং শুরু হচ্ছে। স্ক্রিন বাছার উইন্ডো আসলে স্ক্রিন বেছে নিন।");
+    startRecording();
+    if(s.duration>0) setTimeout(function(){ if(recording) finishRecording(false); }, s.duration*60000);
+  }
+}
 
 function supported(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
@@ -340,14 +585,36 @@ function startRecording(){
     live.srcObject=s; live.classList.remove("hidden");
     live.play().catch(function(){});
 
+    /* v1.1.0: webcam overlay — camera track composited onto the recorded
+     * canvas. If the camera is denied/unavailable, record without it
+     * and say so plainly instead of faking the overlay. */
+    var setupCam=Promise.resolve();
+    if($("camChk").checked){
+      if(!navigator.mediaDevices.getUserMedia){
+        camFailed=true;
+        showOk("সতর্কতা: এই ব্রাউজারে ক্যামেরা সাপোর্ট করে না — ওয়েবক্যাম ওভারলে ছাড়াই রেকর্ড হচ্ছে।");
+      }else{
+        setupCam=navigator.mediaDevices.getUserMedia({video:{width:320}, audio:false}).then(function(cs){
+          camStream=cs; camFailed=false;
+          camVideo=document.createElement("video");
+          camVideo.muted=true; camVideo.srcObject=cs;
+          return camVideo.play().then(function(){ startComposite(); });
+        }).catch(function(err){
+          camFailed=true;
+          showOk("সতর্কতা: ক্যামেরা চালু হয়নি ("+(err&&err.message?err.message:err)+") — ওয়েবক্যাম ওভারলে ছাড়াই রেকর্ড হচ্ছে।");
+        });
+      }
+    }
+    setupCam.then(function(){
+    var recStream=compositeStream || s;
     var mime=pickMime();
     var opts={};
     if(mime) opts.mimeType=mime;
     opts.videoBitsPerSecond=qualityBits();
     try{
-      recorder=new MediaRecorder(s, opts);
+      recorder=new MediaRecorder(recStream, opts);
     }catch(e){
-      try{ recorder=new MediaRecorder(s); }
+      try{ recorder=new MediaRecorder(recStream); }
       catch(e2){ showErr("রেকর্ডার চালু করা যায়নি: "+e2.message); stopStream(); return; }
     }
     chunks=[];
@@ -367,10 +634,11 @@ function startRecording(){
     $("timer").classList.add("rec");
     $("timerLabel").textContent="● রেকর্ড হচ্ছে";
     setButtons();
-    setStatus("<b>রেকর্ড হচ্ছে</b>"+(atrack?" — সিস্টেম অডিওসহ":" — অডিও ছাড়া (এই শেয়ারে অডিও আসেনি)")+"। থামাতে Stop চাপুন, অথবা ব্রাউজারের শেয়ার বার থেকে বন্ধ করুন।");
+    setStatus("<b>রেকর্ড হচ্ছে</b>"+(atrack?" — সিস্টেম অডিওসহ":" — অডিও ছাড়া (এই শেয়ারে অডিও আসেনি)")+(compositeStream?" — ওয়েবক্যাম ওভারলেসহ":"")+"। থামাতে Stop চাপুন, অথবা ব্রাউজারের শেয়ার বার থেকে বন্ধ করুন।");
     if(wantAudio && !atrack){
       showOk("সতর্কতা: সিস্টেম অডিও চাওয়া হয়েছিল, কিন্তু এই শেয়ারে অডিও ট্র্যাক আসেনি — ভিডিওটা নীরব হবে। ট্যাব শেয়ার করলে অডিও আসার সম্ভাবনা বেশি।");
     }
+    }); /* end setupCam.then */
   }).catch(function(err){
     if(err && err.name==="NotAllowedError"){
       showErr("আপনি স্ক্রিন শেয়ারের অনুমতি দেননি — রেকর্ড শুরু হয়নি। আবার চেষ্টা করে স্ক্রিন বেছে নিন।");
@@ -446,6 +714,7 @@ function onRecorderStopped(){
 }
 
 function stopStream(){
+  stopComposite();
   if(stream){
     stream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
     stream=null;
@@ -465,6 +734,7 @@ function captureFrame(videoEl){
   return c;
 }
 function saveShot(canvas){
+  lastShotCanvas=canvas;
   canvas.toBlob(function(blob){
     if(!blob){ showErr("স্ক্রিনশট বানানো যায়নি — ভিডিও ফ্রেম এখনো তৈরি হয়নি, একটু পরে আবার চাপুন।"); return; }
     if(lastShotUrl) URL.revokeObjectURL(lastShotUrl);
@@ -485,6 +755,14 @@ function takeScreenshot(){
   if(!supported()) return;
   clearMsgs();
   if(stream){
+    /* v1.1.0: screenshot from the composited canvas when the webcam
+     * overlay is on, so the face-cam is in the screenshot too. */
+    if(compositeCanvas && compositeCanvas.width>0){
+      var cc=document.createElement("canvas");
+      cc.width=compositeCanvas.width; cc.height=compositeCanvas.height;
+      cc.getContext("2d").drawImage(compositeCanvas,0,0);
+      saveShot(cc); return;
+    }
     var live=$("livePreview");
     if(live.videoWidth>0){
       var c=captureFrame(live);
@@ -513,6 +791,154 @@ function takeScreenshot(){
     if(err && err.name==="NotAllowedError") showErr("আপনি স্ক্রিন শেয়ারের অনুমতি দেননি — স্ক্রিনশট নেওয়া হয়নি।");
     else showErr("স্ক্রিনশট নেওয়া যায়নি: "+(err && err.message ? err.message : err));
   });
+}
+
+/* ---------- v1.1.0: screenshot annotation ---------- */
+var annCtx=null, annTool="pen", annDrawing=false, annPoints=[], annUndoStack=[];
+function annSetTool(tool){
+  annTool=tool;
+  ["toolPen","toolArrow","toolText"].forEach(function(id){ $(id).classList.remove("active"); });
+  $("toolPen").classList.toggle("active", tool==="pen");
+  $("toolArrow").classList.toggle("active", tool==="arrow");
+  $("toolText").classList.toggle("active", tool==="text");
+}
+function annPos(ev){
+  var canvas=$("annotateCanvas");
+  var rect=canvas.getBoundingClientRect();
+  var scale=canvas.width/rect.width;
+  return [(ev.clientX-rect.left)*scale, (ev.clientY-rect.top)*scale];
+}
+function annPushUndo(){
+  var canvas=$("annotateCanvas");
+  annUndoStack.push(canvas.toDataURL("image/png"));
+  if(annUndoStack.length>20) annUndoStack.shift();
+}
+function annDrawStroke(pts, preview){
+  var canvas=$("annotateCanvas");
+  var ctx=annCtx;
+  if(!preview) annPushUndo();
+  ctx.strokeStyle=$("annColor").value;
+  ctx.fillStyle=$("annColor").value;
+  ctx.lineWidth=+$("annWidth").value;
+  ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.beginPath();
+  if(annTool==="pen" && pts.length>=2){
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+    ctx.stroke();
+  }else if(annTool==="arrow" && pts.length>=2){
+    var x1=pts[0][0], y1=pts[0][1], x2=pts[pts.length-1][0], y2=pts[pts.length-1][1];
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    var angle=Math.atan2(y2-y1,x2-x1), head=Math.max(10,ctx.lineWidth*4);
+    [[Math.PI-0.45],[Math.PI+0.45]].forEach(function(d){
+      var a=angle+d[0];
+      ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2+head*Math.cos(a), y2+head*Math.sin(a)); ctx.stroke();
+    });
+  }
+}
+function annRedrawFrom(dataUrl, done){
+  var img=new Image();
+  img.onload=function(){
+    var canvas=$("annotateCanvas");
+    annCtx.clearRect(0,0,canvas.width,canvas.height);
+    annCtx.drawImage(img,0,0);
+    if(done) done();
+  };
+  img.src=dataUrl;
+}
+function openAnnotate(){
+  if(!lastShotCanvas){ showErr("আগে একটি স্ক্রিনশট নিন, তারপর এডিট করুন।"); return; }
+  var canvas=$("annotateCanvas");
+  canvas.width=lastShotCanvas.width;
+  canvas.height=lastShotCanvas.height;
+  annCtx=canvas.getContext("2d");
+  annCtx.drawImage(lastShotCanvas,0,0);
+  annUndoStack=[];
+  $("annotateWrap").classList.add("show");
+  $("annotateWrap").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+function annSave(){
+  var canvas=$("annotateCanvas");
+  canvas.toBlob(function(blob){
+    if(!blob){ showErr("এডিট করা ছবি বানানো যায়নি।"); return; }
+    if(lastShotUrl) URL.revokeObjectURL(lastShotUrl);
+    var d=new Date();
+    lastShotBlob=blob;
+    lastShotName="ghost-screenshot-annotated-"+d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")+String(d.getSeconds()).padStart(2,"0")+".png";
+    lastShotUrl=URL.createObjectURL(blob);
+    lastShotCanvas=canvas;
+    $("shotImg").src=lastShotUrl;
+    $("shotWrap").classList.add("show");
+    $("shotMeta").innerHTML="ফাইল: <b>"+lastShotName+"</b> • সাইজ: <b>"+fmtBytes(blob.size)+"</b> • রেজোলিউশন: <b>"+bnNum(canvas.width)+"×"+bnNum(canvas.height)+"</b> • এডিট করা হয়েছে";
+    counts.shots++; counts.bytes+=blob.size; refreshStats();
+    addHistory({kind:"screenshot", name:lastShotName, date:Date.now(), size:blob.size, duration:null, blobUrl:lastShotUrl}, blob);
+    $("annotateWrap").classList.remove("show");
+    showOk("এডিট করা স্ক্রিনশট তৈরি — “স্ক্রিনশট ডাউনলোড করুন” চাপলে PNG নামবে।");
+  },"image/png");
+}
+
+/* ---------- v1.1.0: GIF export (real encoder, in-browser) ---------- */
+var gifBusy=false;
+function exportGif(){
+  if(gifBusy) return;
+  if(!lastBlobUrl){ showErr("আগে একটি রেকর্ডিং করুন, তারপর GIF বানান।"); return; }
+  gifBusy=true;
+  var btn=$("gifBtn"); btn.disabled=true;
+  var meta=$("gifMeta"); meta.style.display="block";
+  meta.textContent="GIF বানানো হচ্ছে… ভিডিওটা ফ্রেমে ফ্রেমে পড়া হচ্ছে।";
+  var video=document.createElement("video");
+  video.muted=true; video.preload="auto"; video.src=lastBlobUrl;
+  video.onloadedmetadata=function(){
+    var duration=video.duration;
+    if(!duration || !isFinite(duration)){ gifDone("এই ভিডিওর সময় জানা যায়নি, GIF বানানো গেল না।"); return; }
+    var fps=8, maxFrames=100, maxWidth=320;
+    var total=Math.min(maxFrames, Math.max(1, Math.floor(duration*fps)));
+    var w=Math.min(maxWidth, video.videoWidth);
+    var h=Math.round(w*video.videoHeight/video.videoWidth);
+    var canvas=document.createElement("canvas");
+    canvas.width=w; canvas.height=h;
+    var ctx=canvas.getContext("2d");
+    var frames=[], idx=0;
+    function grabNext(){
+      if(idx>=total){ finishGif(); return; }
+      var t=Math.min(duration-0.05, idx/fps);
+      video.currentTime=t;
+    }
+    video.onseeked=function(){
+      ctx.drawImage(video,0,0,w,h);
+      frames.push(ctx.getImageData(0,0,w,h).data);
+      meta.textContent="GIF বানানো হচ্ছে… "+bnNum(idx+1)+"/"+bnNum(total)+" ফ্রেম";
+      idx++;
+      grabNext();
+    };
+    video.onerror=function(){ gifDone("ভিডিওটা পড়া যায়নি, GIF বানানো গেল না।"); };
+    grabNext();
+    function finishGif(){
+      try{
+        var bytes=encodeGIF(frames, w, h, Math.round(100/fps));
+        var blob=new Blob([bytes], {type:"image/gif"});
+        var url=URL.createObjectURL(blob);
+        var d=new Date();
+        var name=lastName.replace(/\.webm$/i,"")+"-clip.gif";
+        downloadBlob(url, name);
+        meta.innerHTML="GIF তৈরি: <b>"+name+"</b> • সাইজ: <b>"+fmtBytes(blob.size)+"</b> • ফ্রেম: <b>"+bnNum(frames.length)+"</b>";
+        counts.bytes+=blob.size; refreshStats();
+        addHistory({kind:"gif", name:name, date:Date.now(), size:blob.size, duration:null, blobUrl:url}, blob);
+        showOk("GIF ডাউনলোড হয়েছে।");
+      }catch(e){
+        gifDone("GIF এনকোড করতে সমস্যা হয়েছে: "+e.message);
+        return;
+      }
+      gifBusy=false; btn.disabled=false;
+    }
+    function gifDone(msg){
+      meta.textContent="";
+      meta.style.display="none";
+      showErr(msg);
+      gifBusy=false; btn.disabled=false;
+    }
+  };
+  video.onerror=function(){ meta.style.display="none"; showErr("ভিডিওটা পড়া যায়নি, GIF বানানো গেল না।"); gifBusy=false; btn.disabled=false; };
 }
 
 /* ---------- download ---------- */
@@ -607,6 +1033,88 @@ $("downloadBtn").addEventListener("click", function(){
 $("shotDownloadBtn").addEventListener("click", function(){
   if(lastShotUrl) downloadBlob(lastShotUrl, lastShotName);
 });
+$("annotateBtn").addEventListener("click", openAnnotate);
+$("gifBtn").addEventListener("click", exportGif);
+$("toolPen").addEventListener("click", function(){ annSetTool("pen"); });
+$("toolArrow").addEventListener("click", function(){ annSetTool("arrow"); });
+$("toolText").addEventListener("click", function(){ annSetTool("text"); });
+$("annUndo").addEventListener("click", function(){
+  var prev=annUndoStack.pop();
+  if(prev) annRedrawFrom(prev);
+});
+$("annClear").addEventListener("click", function(){
+  if(!lastShotCanvas) return;
+  annPushUndo();
+  annCtx.drawImage(lastShotCanvas,0,0);
+});
+$("annSave").addEventListener("click", annSave);
+$("annCancel").addEventListener("click", function(){
+  $("annotateWrap").classList.remove("show");
+});
+(function(){
+  var canvas=$("annotateCanvas");
+  var snapshot=null;
+  function redrawWithPreview(pts){
+    if(snapshot) annRedrawFrom(snapshot, function(){ annDrawStroke(pts, true); });
+  }
+  canvas.addEventListener("pointerdown", function(ev){
+    ev.preventDefault();
+    canvas.setPointerCapture(ev.pointerId);
+    var pos=annPos(ev);
+    if(annTool==="text"){
+      var text=window.prompt("ছবিতে বসানোর টেক্সট লিখুন:");
+      if(text){
+        annPushUndo();
+        annCtx.fillStyle=$("annColor").value;
+        annCtx.font="bold "+Math.max(14, +$("annWidth").value*8)+"px sans-serif";
+        annCtx.fillText(text, pos[0], pos[1]);
+      }
+      return;
+    }
+    annDrawing=true;
+    annPoints=[pos];
+    snapshot=canvas.toDataURL("image/png");
+  });
+  canvas.addEventListener("pointermove", function(ev){
+    if(!annDrawing) return;
+    annPoints.push(annPos(ev));
+    redrawWithPreview(annPoints);
+  });
+  function endStroke(ev){
+    if(!annDrawing) return;
+    annDrawing=false;
+    annPoints.push(annPos(ev));
+    if(snapshot) annRedrawFrom(snapshot, function(){ annDrawStroke(annPoints, false); });
+    annPoints=[]; snapshot=null;
+  }
+  canvas.addEventListener("pointerup", endStroke);
+  canvas.addEventListener("pointercancel", function(){ annDrawing=false; annPoints=[]; snapshot=null; });
+})();
+/* v1.1.0: scheduled recording controls */
+(function(){
+  var s=loadSchedule();
+  $("schedTime").value=s.time;
+  $("schedDur").value=s.duration;
+  $("schedEnable").checked=s.enabled;
+  $("schedSaveBtn").addEventListener("click", function(){
+    var t=$("schedTime").value;
+    var d=+$("schedDur").value;
+    if(!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(t)){ showErr("সময় সঠিক নয় — HH:MM ফরম্যাটে লিখুন (যেমন 09:00)।"); return; }
+    if(isNaN(d) || d<0 || d>480){ showErr("সময়কাল ০–৪৮০ মিনিটের মধ্যে হতে হবে।"); return; }
+    var cur=loadSchedule();
+    saveSchedule({time:t, duration:d, enabled:$("schedEnable").checked, firedDate:cur.firedDate});
+    showOk("⏰ সময়সূচি সংরক্ষিত হয়েছে — এই পাতা খোলা থাকলে নির্ধারিত সময়ে রেকর্ড শুরু হবে।");
+    refreshSchedStatus();
+  });
+  $("schedEnable").addEventListener("change", function(){
+    var cur=loadSchedule();
+    cur.enabled=$("schedEnable").checked;
+    saveSchedule(cur);
+    refreshSchedStatus();
+  });
+  setInterval(checkSchedule, 1000);
+  refreshSchedStatus();
+})();
 $("clearHistBtn").addEventListener("click", function(){
   try{ localStorage.removeItem(HIST_KEY); }catch(e){}
   Object.keys(inSessionBlobs).forEach(function(k){ delete inSessionBlobs[k]; });
