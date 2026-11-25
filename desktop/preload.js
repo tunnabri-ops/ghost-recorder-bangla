@@ -19,8 +19,19 @@ contextBridge.exposeInMainWorld('ghostRecorder', {
   // Opens a URL — main only allows this repo's releases page. Returns { ok, error? }.
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
-  // Current app version string, e.g. "1.0.0".
+  // Current app version string, e.g. "1.1.0".
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+
+  // v1.1.0 — Convert a saved WebM recording to GIF (ffmpeg in main).
+  // Args: { inputPath, defaultName }. Returns { cancelled, path, error? }.
+  exportGif: (payload) => ipcRenderer.invoke('export-gif', payload),
+
+  // v1.1.0 — Scheduled recording, persisted in main (userData/schedule.json).
+  // getSchedule returns { time, durationMinutes, enabled, lastFiredDate }.
+  // saveSchedule returns { ok, schedule?, error? }.
+  getSchedule: () => ipcRenderer.invoke('get-schedule'),
+  saveSchedule: (schedule) => ipcRenderer.invoke('save-schedule', schedule),
+  clearSchedule: () => ipcRenderer.invoke('clear-schedule'),
 
   // Hide the window to the tray (tray menu: Show / Check for update / Quit).
   minimizeToTray: () => ipcRenderer.send('minimize-to-tray'),

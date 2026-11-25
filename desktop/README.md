@@ -4,6 +4,20 @@ Bangla screen recorder + screenshot tool. Pick a screen or window, record it
 to WebM, or capture the current frame as a PNG. Dark Bangla UI, history with
 search, minimize-to-tray, and an update check against GitHub releases.
 
+## 🆕 What's new in v1.1.0
+
+- **📷 Webcam overlay** — tick the checkbox and your face-cam is composited
+  into a corner of the recording (corner selectable); if the camera is
+  denied, the recording still happens without it and the app says so.
+- **✏️ Screenshot annotate** — after a screenshot, draw with a pen, add
+  arrows and text, pick a colour, undo, then save the edited PNG.
+- **🎞 GIF export** — the GIF button converts the last saved recording to
+  an animated GIF with ffmpeg (bundled via `ffmpeg-static`, or the system
+  `ffmpeg` on PATH; a clear error appears when neither is available).
+- **⏰ Scheduled recording** — set a time + duration; the schedule is saved
+  (in the app's userData folder) and the app starts recording automatically
+  when due, even from the tray, using the last selected source.
+
 ## Install
 
 ```bash
@@ -54,6 +68,10 @@ Produces an NSIS installer (choose install folder) + a portable exe in
 
 - `main.js` — window, tray, IPC handlers (`get-sources`, `save-file`,
   `check-for-update`, `open-external`, `get-app-version`,
-  `minimize-to-tray`, `quit-app`)
+  `minimize-to-tray`, `quit-app`, plus v1.1.0: `export-gif`,
+  `get-schedule`, `save-schedule`, `clear-schedule`)
 - `preload.js` — `contextBridge` exposing only `window.ghostRecorder`
 - `renderer/` — Bangla dark UI (`index.html`, `style.css`, `renderer.js`)
+- `package.json` — version 1.1.0; `ffmpeg-static` is a dependency (GIF
+  export) and its binary is included in the packaged app via the
+  `build.files` list, so GIF export works on a fresh Windows install.

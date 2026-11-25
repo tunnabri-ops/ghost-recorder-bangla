@@ -3,6 +3,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const { spawn } = require('child_process');
 
 const REPO = 'tunnabri-ops/ghost-recorder-bangla';
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
@@ -164,7 +166,9 @@ ipcMain.handle('save-file', async (_event, payload) => {
   const filters =
     kind === 'png'
       ? [{ name: 'PNG Image', extensions: ['png'] }]
-      : [{ name: 'WebM Video', extensions: ['webm'] }];
+      : kind === 'gif'
+        ? [{ name: 'GIF Image', extensions: ['gif'] }]
+        : [{ name: 'WebM Video', extensions: ['webm'] }];
   const { canceled, filePath } = await dialog.showSaveDialog({
     defaultPath: defaultName,
     filters,
@@ -181,6 +185,107 @@ ipcMain.handle('save-file', async (_event, payload) => {
 
 // ---- IPC: update check ----------------------------------------------------
 ipcMain.handle('check-for-update', async () => checkForUpdate());
+
+// ---- IPC: GIF export (v1.1.0) ---------------------------------------------
+// Converts a saved WebM recording to an animated GIF with ffmpeg
+// (two-pass palettegen/paletteuse, 10 fps, 480px wide).
+// ffmpeg comes from the bundled ffmpeg-static binary when installed;
+// otherwise the system `ffmpeg` on PATH is used. A missing ffmpeg is
+// reported as a clear error — no fake GIF is ever produced.
+function findFfmpeg() {
+  try {
+    // eslint-disable-next-line global-require
+    const bundled = require('ffmpeg-static');
+    if (bundled && fs.existsSync(bundled)) return bundled;
+  } catch (_err) { /* not installed: fall through to PATH */ }
+  return 'ffmpeg';
+}
+
+ipcMain.handle('export-gif', async (_event, payload) => {
+  const { inputPath, defaultName } = payload || {};
+  if (!inputPath || !fs.existsSync(inputPath)) {
+    return { cancelled: true, path: null, error: 'input-not-found' };
+  }
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    defaultPath: defaultName || 'ghost-recorder.gif',
+    filters: [{ name: 'GIF Image', extensions: ['gif'] }],
+  });
+  if (canceled || !filePath) return { cancelled: true, path: null };
+  const ffmpeg = findFfmpeg();
+  const palettePath = path.join(os.tmpdir(), `ghost-recorder-palette-${process.pid}.png`);
+  const vf = 'fps=10,scale=480:-1:flags=lanczos';
+  const run = (args) => new Promise((resolve, reject) => {
+    const proc = spawn(ffmpeg, args);
+    let stderr = '';
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(stderr.slice(-300) || `ffmpeg exited with code ${code}`));
+    });
+  });
+  try {
+    await run(['-y', '-i', inputPath, '-vf', `${vf},palettegen`, palettePath]);
+    await run(['-y', '-i', inputPath, '-i', palettePath, '-lavfi',
+      `${vf}[x];[x][1:v]paletteuse`, filePath]);
+  } catch (err) {
+    return {
+      cancelled: true,
+      path: null,
+      error: String(err && err.message ? err.message : err),
+    };
+  } finally {
+    try { fs.unlinkSync(palettePath); } catch (_err) { /* palette is temp */ }
+  }
+  return { cancelled: false, path: filePath };
+});
+
+// ---- IPC: scheduled recording (v1.1.0) ------------------------------------
+// The schedule lives in a JSON file under the app's userData folder, so it
+// survives restarts. The renderer checks it on an interval and starts the
+// recording when due; main only stores it.
+function scheduleFilePath() {
+  return path.join(app.getPath('userData'), 'schedule.json');
+}
+
+function readSchedule() {
+  const fallback = { time: '09:00', durationMinutes: 5, enabled: false, lastFiredDate: null };
+  try {
+    const raw = fs.readFileSync(scheduleFilePath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return { ...fallback, ...parsed };
+  } catch (_err) { /* missing/corrupt file: defaults */ }
+  return fallback;
+}
+
+ipcMain.handle('get-schedule', () => readSchedule());
+
+ipcMain.handle('save-schedule', async (_event, schedule) => {
+  const s = schedule || {};
+  const time = String(s.time || '');
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    return { ok: false, error: 'bad-time' };
+  }
+  const durationMinutes = Math.max(0, Math.min(480, parseInt(s.durationMinutes, 10) || 0));
+  const out = {
+    time,
+    durationMinutes,
+    enabled: !!s.enabled,
+    lastFiredDate: typeof s.lastFiredDate === 'string' ? s.lastFiredDate : null,
+  };
+  try {
+    fs.mkdirSync(path.dirname(scheduleFilePath()), { recursive: true });
+    fs.writeFileSync(scheduleFilePath(), JSON.stringify(out, null, 2));
+    return { ok: true, schedule: out };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+});
+
+ipcMain.handle('clear-schedule', async () => {
+  try { fs.unlinkSync(scheduleFilePath()); } catch (_err) { /* already gone */ }
+  return { ok: true };
+});
 
 // ---- IPC: app version -----------------------------------------------------
 ipcMain.handle('get-app-version', () => app.getVersion());

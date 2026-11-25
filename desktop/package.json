@@ -1,1 +1,41 @@
-{"author":"tunnabri-ops","build":{"appId":"com.tunnabri.ghostrecorderbangla","files":["main.js","preload.js","renderer/**/*"],"nsis":{"allowToChangeInstallationDirectory":true,"oneClick":false},"productName":"Ghost Recorder Bangla","win":{"target":["nsis","portable"]}},"description":"Ghost Recorder Bangla — Bangla screen recorder + screenshot tool (Electron desktop app)","devDependencies":{"electron":"^33.2.1","electron-builder":"^25.1.8"},"license":"MIT","main":"main.js","name":"ghost-recorder-bangla","productName":"Ghost Recorder Bangla","scripts":{"build":"electron-builder","build:win":"electron-builder --win","start":"electron ."},"version":"1.0.0"}
+{
+  "author": "tunnabri-ops",
+  "build": {
+    "appId": "com.tunnabri.ghostrecorderbangla",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "node_modules/ffmpeg-static/**/*"
+    ],
+    "nsis": {
+      "allowToChangeInstallationDirectory": true,
+      "oneClick": false
+    },
+    "productName": "Ghost Recorder Bangla",
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
+  "description": "Ghost Recorder Bangla \u2014 Bangla screen recorder + screenshot tool (Electron desktop app)",
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "license": "MIT",
+  "main": "main.js",
+  "name": "ghost-recorder-bangla",
+  "productName": "Ghost Recorder Bangla",
+  "scripts": {
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "start": "electron ."
+  },
+  "version": "1.1.0",
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  }
+}
