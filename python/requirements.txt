@@ -4,3 +4,4 @@ imageio
 imageio-ffmpeg
 numpy
 Pillow
+opencv-python  # optional — webcam overlay only; without it the overlay option is honestly disabled
