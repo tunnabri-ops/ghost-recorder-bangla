@@ -10,6 +10,13 @@
 
 > বাংলা সংস্করণ নিচে আছে। / Bangla version below.
 
+## 🆕 What's new in v1.1.0
+
+- **📷 Webcam overlay** — a small face-cam in a corner of the recording (corner selectable). Web + Electron composite the camera onto the recorded video; Python overlays with OpenCV when a camera is available — and says so plainly (option disabled) when OpenCV or a camera is missing, instead of faking it.
+- **✏️ Screenshot annotate** — draw with a pen, add arrows and text, pick a colour, undo, then save the edited PNG. Available in all three versions.
+- **🎞 GIF export** — turn a recording into an animated GIF. Web uses a built-in GIF encoder (no library); Python exports with PIL (or ffmpeg for video files); Electron converts with ffmpeg.
+- **⏰ Scheduled recording** — set a time and the recording starts automatically. Python + Electron persist the schedule and check it while the app runs; the web version works while the page stays open (and says so in the UI).
+
 ## ✨ Features
 
 - **Record screen / window / tab** — pick what to record, the browser or desktop app captures it
@@ -19,6 +26,10 @@
 - **Screenshot** — capture the current frame as a PNG, full screen or a region (Python desktop)
 - **Recording quality** — high / medium / low bitrate (web)
 - **Recording history** — finished recordings and screenshots are listed; search your history on desktop
+- **Webcam overlay** — small face-cam in a corner of the recording (v1.1.0)
+- **Screenshot annotate** — pen, arrows, text before saving (v1.1.0)
+- **GIF export** — turn a recording into an animated GIF (v1.1.0)
+- **Scheduled recording** — starts automatically at a set time (v1.1.0)
 - **Minimize to tray** (Electron desktop) — closing the window hides it in the system tray
 - **Update check** (Electron desktop) — checks GitHub releases and tells you when a newer version is out
 
@@ -59,6 +70,9 @@ Pick a screen or window from the thumbnail list, record to **WebM**, take screen
 - The browser asks for screen permission **every time** — nothing records without you picking a screen.
 - **System audio capture depends on the browser and OS** — on some setups the recording may be silent. The app tells you if no audio track arrives.
 - Web and Electron record **WebM** video; Python desktop records **MP4**.
+- **Webcam overlay needs a camera + permission.** Python also needs OpenCV (`pip install opencv-python`); without it the option is disabled with a clear message. If the camera is denied mid-setup, the recording still happens — without the overlay, and the app says so.
+- **Scheduled recording needs the app/page running.** Python + Electron keep the schedule saved and check it while the app runs (even minimized to the tray); the web version only works while the page stays open. A missed time (app closed) does not fire late.
+- **GIF export needs something to convert with.** Web encodes in the browser; Python uses PIL/ffmpeg; Electron uses ffmpeg (bundled via `ffmpeg-static`, or the system `ffmpeg` on PATH) — if ffmpeg is missing, Electron reports a clear error instead of a fake GIF.
 - If you stop sharing (or close the shared window), the recording stops — what was captured up to that point is still saved.
 - The Python app needs a real display to capture the screen; it refuses cleanly with a clear message when there is none.
 
