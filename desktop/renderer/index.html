@@ -12,7 +12,7 @@
     <span class="ghost" aria-hidden="true">👻</span>
     <div>
       <h1>Ghost Recorder Bangla</h1>
-      <p>স্ক্রিন রেকর্ডার + স্ক্রিনশট &nbsp;·&nbsp; <span id="appVersion">v1.0.0</span></p>
+      <p>স্ক্রিন রেকর্ডার + স্ক্রিনশট &nbsp;·&nbsp; <span id="appVersion">v1.1.0</span></p>
     </div>
   </div>
   <div class="top-actions">
@@ -44,8 +44,21 @@
     <h2>২. রেকর্ড করুন</h2>
     <div class="preview-wrap">
       <video id="preview" autoplay muted playsinline></video>
+      <canvas id="compositePreview" class="hidden" aria-label="লাইভ প্রিভিউ — ওয়েবক্যাম ওভারলেসহ"></canvas>
       <div id="previewEmpty" class="preview-empty">প্রিভিউ এখানে দেখা যাবে — প্রথমে একটি সোর্স বেছে নিন</div>
       <div id="recBadge" class="rec-badge hidden">● REC <span id="timer">00:00</span></div>
+    </div>
+    <div class="cam-row">
+      <label><input type="checkbox" id="camChk"> 📷 ওয়েবক্যাম ওভারলে</label>
+      <label>কোণা
+        <select id="camCorner" aria-label="ওয়েবক্যাম কোণা">
+          <option value="bottom-right" selected>নিচে ডানে</option>
+          <option value="bottom-left">নিচে বামে</option>
+          <option value="top-right">উপরে ডানে</option>
+          <option value="top-left">উপরে বামে</option>
+        </select>
+      </label>
+      <span id="camNote" class="hint">ক্যামেরার অনুমতি চাইলে দিতে হবে; না দিলে ওভারলে ছাড়াই রেকর্ড হবে।</span>
     </div>
     <div class="timer-row">
       <span>সময়: <strong id="timerBig">00:00</strong></span>
@@ -57,8 +70,27 @@
       <button id="btnResume" class="btn hidden" type="button" disabled>▶ আবার শুরু</button>
       <button id="btnStop" class="btn stop" type="button" disabled>■ থামান</button>
       <button id="btnScreenshot" class="btn" type="button" disabled>📸 স্ক্রিনশট</button>
+      <button id="btnGif" class="btn" type="button" disabled>🎞 GIF করুন</button>
     </div>
-    <p class="hint">রেকর্ড থামালে WebM ফাইল সেভ করার উইন্ডো আসবে। স্ক্রিনশট PNG হিসেবে সেভ হয়।</p>
+    <p class="hint">রেকর্ড থামালে WebM ফাইল সেভ করার উইন্ডো আসবে। স্ক্রিনশট PNG হিসেবে সেভ হয়। GIF বোতাম শেষ সেভ করা রেকর্ডিং থেকে অ্যানিমেটেড GIF বানায় (ffmpeg লাগবে — না থাকলে পরিষ্কার বার্তা আসবে)।</p>
+
+    <div id="annotatePanel" class="annotate-panel hidden">
+      <h3>✏️ স্ক্রিনশট এডিট করুন</h3>
+      <div class="annotate-tools">
+        <button class="btn small tool-btn active" id="toolPen" type="button">✏️ কলম</button>
+        <button class="btn small tool-btn" id="toolArrow" type="button">➡️ তীর</button>
+        <button class="btn small tool-btn" id="toolText" type="button">🔤 টেক্সট</button>
+        <input type="color" id="annColor" value="#ff0000" aria-label="রং">
+        <label>মোটা <input type="range" id="annWidth" min="1" max="12" value="3" aria-label="লাইনের মোটা"></label>
+        <button class="btn small" id="annUndo" type="button">↩ Undo</button>
+      </div>
+      <canvas id="annotateCanvas"></canvas>
+      <p class="hint">কলম/তীর: টেনে আঁকুন। টেক্সট: ছবিতে ক্লিক করে লিখুন। সেভ করলে এডিট করা ছবিটাই PNG হবে।</p>
+      <div class="controls">
+        <button class="btn primary" id="annSave" type="button">✅ এডিট করা ছবি সেভ করুন</button>
+        <button class="btn ghost-btn" id="annCancel" type="button">বাতিল</button>
+      </div>
+    </div>
   </section>
 
   <section class="panel history-panel">
@@ -73,6 +105,18 @@
     <p class="hint">হিস্টোরি শুধু এই সেশনের — অ্যাপ বন্ধ করলে মুছে যাবে, ফাইল আপনার কম্পিউটারে থাকবে।</p>
   </section>
 </main>
+
+<section class="panel sched-panel">
+  <h2>⏰ নির্ধারিত রেকর্ডিং — Scheduled recording</h2>
+  <p class="hint">নির্ধারিত সময়ে রেকর্ডিং নিজে থেকে শুরু হবে — সময়সূচি অ্যাপে সংরক্ষিত থাকে, অ্যাপ বন্ধ করে খুললেও মনে থাকে। অ্যাপ চালু (এমনকি ট্রেতে লুকানো) থাকলেই চলবে; নির্ধারিত সময়ে আগে থেকে বাছা সোর্স দিয়েই রেকর্ড শুরু হয় — সোর্স বাছা না থাকলে প্রথম সোর্সটি ব্যবহার করা হয়।</p>
+  <div class="sched-row">
+    <label>সময় <input type="time" id="schedTime" value="09:00"></label>
+    <label>সময়কাল (মিনিট, ০ = নিজে থামাবেন) <input type="number" id="schedDur" min="0" max="480" value="5"></label>
+    <label><input type="checkbox" id="schedEnable"> চালু করুন</label>
+    <button id="schedSaveBtn" class="btn small" type="button">সংরক্ষণ করুন</button>
+  </div>
+  <p class="hint" id="schedStatus">নির্ধারিত রেকর্ডিং বন্ধ আছে।</p>
+</section>
 
 <footer class="footer">
   <span>Ghost Recorder Bangla · ফ্রি ও ওপেন সোর্স</span>

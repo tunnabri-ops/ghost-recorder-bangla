@@ -34,8 +34,19 @@ const state = {
   timerId: null,
   startedAt: 0, // Date.now() when (re)started, adjusted for pauses
   elapsedBeforePause: 0,
-  history: [], // { kind: 'video'|'image', name, path, time }
+  history: [], // { kind: 'video'|'image'|'gif', name, path, time }
   pendingUpdateUrl: null,
+  // v1.1.0 — webcam overlay
+  camStream: null,
+  camVideo: null,
+  compositeCanvas: null,
+  compositeCtx: null,
+  compositeRAF: 0,
+  compositeStream: null,
+  lastVideoPath: null,
+  // v1.1.0 — scheduled recording (persisted in main)
+  schedule: { time: '09:00', durationMinutes: 5, enabled: false, lastFiredDate: null },
+  schedTimerId: null,
 };
 
 function fmt(ms) {
@@ -65,6 +76,7 @@ function updateButtons() {
   $('btnPause').classList.toggle('hidden', state.paused);
   $('btnStop').disabled = !state.recording;
   $('btnScreenshot').disabled = !hasStream || !preview.videoWidth;
+  $('btnGif').disabled = !state.lastVideoPath;
 }
 
 function startTimer() {
@@ -88,6 +100,7 @@ function stopTimer() {
 }
 
 function stopStream() {
+  stopComposite();
   if (state.stream) {
     state.stream.getTracks().forEach((t) => t.stop());
     state.stream = null;
@@ -95,6 +108,71 @@ function stopStream() {
   }
   previewEmpty.classList.remove('hidden');
   updateButtons();
+}
+
+// ---- Webcam overlay (v1.1.0) ----------------------------------------------
+function camCornerXY(w, h, cw, ch) {
+  const m = 12;
+  const corner = $('camCorner').value;
+  if (corner === 'top-left') return [m, m];
+  if (corner === 'top-right') return [w - cw - m, m];
+  if (corner === 'bottom-left') return [m, h - ch - m];
+  return [w - cw - m, h - ch - m]; // bottom-right
+}
+
+function drawComposite() {
+  if (!preview.videoWidth || !state.compositeCanvas) return;
+  const canvas = state.compositeCanvas;
+  if (canvas.width !== preview.videoWidth || canvas.height !== preview.videoHeight) {
+    canvas.width = preview.videoWidth;
+    canvas.height = preview.videoHeight;
+  }
+  const ctx = state.compositeCtx;
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.drawImage(preview, 0, 0, w, h);
+  if (state.camVideo && state.camVideo.videoWidth > 0) {
+    let cw = Math.round(w * 0.25);
+    let ch = Math.round((cw * state.camVideo.videoHeight) / state.camVideo.videoWidth);
+    if (ch > Math.round(h * 0.5)) {
+      ch = Math.round(h * 0.5);
+      cw = Math.round((ch * state.camVideo.videoWidth) / state.camVideo.videoHeight);
+    }
+    const xy = camCornerXY(w, h, cw, ch);
+    ctx.drawImage(state.camVideo, xy[0], xy[1], cw, ch);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(xy[0] - 2, xy[1] - 2, cw + 4, ch + 4);
+  }
+}
+
+function compositeLoop() {
+  drawComposite();
+  state.compositeRAF = requestAnimationFrame(compositeLoop);
+}
+
+function startComposite() {
+  state.compositeCanvas = $('compositePreview');
+  state.compositeCtx = state.compositeCanvas.getContext('2d');
+  state.compositeCanvas.classList.remove('hidden');
+  preview.classList.add('hidden');
+  state.compositeStream = state.compositeCanvas.captureStream(30);
+  compositeLoop();
+}
+
+function stopComposite() {
+  if (state.compositeRAF) cancelAnimationFrame(state.compositeRAF);
+  state.compositeRAF = 0;
+  if (state.compositeCanvas) state.compositeCanvas.classList.add('hidden');
+  preview.classList.remove('hidden');
+  if (state.camStream) {
+    state.camStream.getTracks().forEach((t) => t.stop());
+    state.camStream = null;
+  }
+  state.camVideo = null;
+  state.compositeStream = null;
+  state.compositeCanvas = null;
+  state.compositeCtx = null;
 }
 
 // ---- Sources --------------------------------------------------------------
@@ -184,13 +262,34 @@ function pickMimeType() {
   return '';
 }
 
-function startRecording() {
+async function startRecording() {
   if (!state.stream || state.recording) return;
+  // v1.1.0: webcam overlay — camera track composited onto the recorded
+  // canvas. If the camera is denied/unavailable, record without it and
+  // say so plainly instead of faking the overlay.
+  if ($('camChk').checked && !state.compositeStream) {
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320 },
+        audio: false,
+      });
+      state.camStream = camStream;
+      state.camVideo = document.createElement('video');
+      state.camVideo.muted = true;
+      state.camVideo.srcObject = camStream;
+      await state.camVideo.play();
+      startComposite();
+    } catch (err) {
+      setStatus('ক্যামেরা চালু হয়নি — ওভারলে ছাড়াই রেকর্ড হচ্ছে', false);
+      $('camNote').textContent = `ক্যামেরা চালু হয়নি (${err && err.message ? err.message : err}) — ওভারলে ছাড়াই রেকর্ড হচ্ছে।`;
+    }
+  }
+  const recStream = state.compositeStream || state.stream;
   const mimeType = pickMimeType();
   try {
     state.recorder = mimeType
-      ? new MediaRecorder(state.stream, { mimeType })
-      : new MediaRecorder(state.stream);
+      ? new MediaRecorder(recStream, { mimeType })
+      : new MediaRecorder(recStream);
   } catch (err) {
     alert(`রেকর্ড শুরু হয়নি: ${err && err.message ? err.message : err}`);
     return;
@@ -209,7 +308,7 @@ function startRecording() {
   state.paused = false;
   startTimer();
   recBadge.classList.remove('hidden');
-  setStatus('রেকর্ড হচ্ছে…', true);
+  setStatus(state.compositeStream ? 'রেকর্ড হচ্ছে… (ওয়েবক্যাম ওভারলেসহ)' : 'রেকর্ড হচ্ছে…', true);
   updateButtons();
 }
 
@@ -268,6 +367,7 @@ async function onRecordingStopped() {
     const data = await blob.arrayBuffer();
     const result = await window.ghostRecorder.saveFile({ defaultName: name, data, kind: 'webm' });
     if (result && !result.cancelled && result.path) {
+      state.lastVideoPath = result.path;
       addHistory('video', name, result.path);
       setStatus('রেকর্ডিং সেভ হয়েছে ✓', false);
     } else {
@@ -280,32 +380,227 @@ async function onRecordingStopped() {
   updateButtons();
 }
 
-// ---- Screenshot -----------------------------------------------------------
+// ---- Screenshot + annotation (v1.1.0) -------------------------------------
+// Screenshot draws the current frame (or the composited canvas when the
+// webcam overlay is on) into the annotation editor; saving from the
+// editor writes the edited PNG.
+let annCtx = null;
+let annTool = 'pen';
+let annDrawing = false;
+let annPoints = [];
+let annUndoStack = [];
+let annSnapshot = null;
+
+function annSetTool(tool) {
+  annTool = tool;
+  ['toolPen', 'toolArrow', 'toolText'].forEach((id) => $(id).classList.remove('active'));
+  $('toolPen').classList.toggle('active', tool === 'pen');
+  $('toolArrow').classList.toggle('active', tool === 'arrow');
+  $('toolText').classList.toggle('active', tool === 'text');
+}
+
+function annPos(ev) {
+  const canvas = $('annotateCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const scale = canvas.width / rect.width;
+  return [(ev.clientX - rect.left) * scale, (ev.clientY - rect.top) * scale];
+}
+
+function annPushUndo() {
+  const canvas = $('annotateCanvas');
+  annUndoStack.push(canvas.toDataURL('image/png'));
+  if (annUndoStack.length > 20) annUndoStack.shift();
+}
+
+function annDrawStroke(pts, previewOnly) {
+  const canvas = $('annotateCanvas');
+  const ctx = annCtx;
+  if (!previewOnly) annPushUndo();
+  ctx.strokeStyle = $('annColor').value;
+  ctx.fillStyle = $('annColor').value;
+  ctx.lineWidth = +$('annWidth').value;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (annTool === 'pen' && pts.length >= 2) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.stroke();
+  } else if (annTool === 'arrow' && pts.length >= 2) {
+    const x1 = pts[0][0];
+    const y1 = pts[0][1];
+    const x2 = pts[pts.length - 1][0];
+    const y2 = pts[pts.length - 1][1];
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const head = Math.max(10, ctx.lineWidth * 4);
+    [Math.PI - 0.45, Math.PI + 0.45].forEach((delta) => {
+      const a = angle + delta;
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 + head * Math.cos(a), y2 + head * Math.sin(a));
+      ctx.stroke();
+    });
+  }
+}
+
+function annRedrawFrom(dataUrl, done) {
+  const img = new Image();
+  img.onload = () => {
+    const canvas = $('annotateCanvas');
+    annCtx.clearRect(0, 0, canvas.width, canvas.height);
+    annCtx.drawImage(img, 0, 0);
+    if (done) done();
+  };
+  img.src = dataUrl;
+}
+
+function openAnnotate(sourceCanvas) {
+  const canvas = $('annotateCanvas');
+  canvas.width = sourceCanvas.width;
+  canvas.height = sourceCanvas.height;
+  annCtx = canvas.getContext('2d');
+  annCtx.drawImage(sourceCanvas, 0, 0);
+  annUndoStack = [];
+  $('annotatePanel').classList.remove('hidden');
+  $('annotatePanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function saveAnnotatedShot() {
+  const canvas = $('annotateCanvas');
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) {
+    alert('এডিট করা ছবি বানানো যায়নি।');
+    return;
+  }
+  const name = `ghost-screenshot-annotated-${stamp()}.png`;
+  try {
+    const data = await blob.arrayBuffer();
+    const result = await window.ghostRecorder.saveFile({ defaultName: name, data, kind: 'png' });
+    if (result && !result.cancelled && result.path) {
+      addHistory('image', name, result.path);
+      setStatus('এডিট করা স্ক্রিনশট সেভ হয়েছে ✓', false);
+      $('annotatePanel').classList.add('hidden');
+    }
+  } catch (err) {
+    alert(`স্ক্রিনশট সেভ হয়নি: ${err && err.message ? err.message : err}`);
+  }
+}
+
 async function takeScreenshot() {
   if (!state.stream || !preview.videoWidth) {
     alert('প্রথমে একটি সোর্স বেছে নিন।');
     return;
   }
   const canvas = document.createElement('canvas');
-  canvas.width = preview.videoWidth;
-  canvas.height = preview.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-  if (!blob) {
-    alert('স্ক্রিনশট নেওয়া যায়নি।');
+  if (state.compositeCanvas && state.compositeCanvas.width > 0) {
+    // Webcam overlay is on: capture the composited frame, face-cam included.
+    canvas.width = state.compositeCanvas.width;
+    canvas.height = state.compositeCanvas.height;
+    canvas.getContext('2d').drawImage(state.compositeCanvas, 0, 0);
+  } else {
+    canvas.width = preview.videoWidth;
+    canvas.height = preview.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
+  }
+  openAnnotate(canvas);
+}
+
+// ---- GIF export (v1.1.0) ---------------------------------------------------
+async function exportGif() {
+  if (!state.lastVideoPath) {
+    alert('আগে একটি রেকর্ডিং সেভ করুন, তারপর GIF বানান।');
     return;
   }
-  const name = `ghost-screenshot-${stamp()}.png`;
+  const btn = $('btnGif');
+  btn.disabled = true;
+  setStatus('GIF বানানো হচ্ছে…', false);
   try {
-    const data = await blob.arrayBuffer();
-    const result = await window.ghostRecorder.saveFile({ defaultName: name, data, kind: 'png' });
+    const name = state.lastVideoPath.split(/[\\/]/).pop().replace(/\.webm$/i, '') + '-clip.gif';
+    const result = await window.ghostRecorder.exportGif({
+      inputPath: state.lastVideoPath,
+      defaultName: name,
+    });
     if (result && !result.cancelled && result.path) {
-      addHistory('image', name, result.path);
-      setStatus('স্ক্রিনশট সেভ হয়েছে ✓', false);
+      addHistory('gif', name, result.path);
+      setStatus('GIF সেভ হয়েছে ✓', false);
+    } else if (result && result.error) {
+      setStatus('GIF হয়নি', false);
+      alert(`GIF বানানো যায়নি: ${result.error}`);
+    } else {
+      setStatus('GIF সেভ বাতিল করা হয়েছে', false);
     }
   } catch (err) {
-    alert(`স্ক্রিনশট সেভ হয়নি: ${err && err.message ? err.message : err}`);
+    setStatus('GIF হয়নি', false);
+    alert(`GIF বানানো যায়নি: ${err && err.message ? err.message : err}`);
+  }
+  updateButtons();
+}
+
+// ---- Scheduled recording (v1.1.0) -----------------------------------------
+function refreshSchedStatus() {
+  const s = state.schedule;
+  const el = $('schedStatus');
+  if (!s.enabled) {
+    el.textContent = 'নির্ধারিত রেকর্ডিং বন্ধ আছে।';
+    return;
+  }
+  const now = new Date();
+  const [hh, mm] = s.time.split(':').map(Number);
+  const target = new Date(now);
+  target.setHours(hh, mm, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  const diff = Math.max(0, Math.round((target - now) / 1000));
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const sec = diff % 60;
+  el.textContent = `পরের রেকর্ডিং: ${s.time} — আর ${h} ঘণ্টা ${m} মিনিট ${sec} সেকেন্ড বাকি`
+    + (s.durationMinutes > 0 ? ` (সময়কাল ${s.durationMinutes} মিনিট)` : ' (নিজে থামাতে হবে)')
+    + ' — অ্যাপ চালু থাকলেই চলবে।';
+}
+
+async function persistSchedule(patch) {
+  const next = { ...state.schedule, ...patch };
+  try {
+    const result = await window.ghostRecorder.saveSchedule(next);
+    if (result && result.ok && result.schedule) state.schedule = result.schedule;
+    else if (result && result.error) alert(`সময়সূচি সংরক্ষণ হয়নি: ${result.error}`);
+  } catch (err) {
+    alert(`সময়সূচি সংরক্ষণ হয়নি: ${err && err.message ? err.message : err}`);
+  }
+  refreshSchedStatus();
+}
+
+async function checkSchedule() {
+  refreshSchedStatus();
+  if (state.recording || !state.schedule.enabled) return;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  if (state.schedule.lastFiredDate === today) return;
+  const [hh, mm] = state.schedule.time.split(':').map(Number);
+  const target = new Date(now);
+  target.setHours(hh, mm, 0, 0);
+  if (target <= now && now - target < 90000) {
+    await persistSchedule({ lastFiredDate: today });
+    // Use the already-selected source, or the first one available.
+    if (!state.stream) {
+      const id = state.selectedSourceId || (state.sources[0] && state.sources[0].id);
+      if (!id) {
+        setStatus('নির্ধারিত সময় হয়েছে, কিন্তু কোনো সোর্স পাওয়া যায়নি', false);
+        return;
+      }
+      await selectSource(id);
+    }
+    if (!state.stream) return;
+    setStatus('⏰ নির্ধারিত সময় — রেকর্ডিং শুরু হচ্ছে…', true);
+    await startRecording();
+    if (state.schedule.durationMinutes > 0 && state.recording) {
+      setTimeout(() => { if (state.recording) stopRecording(); }, state.schedule.durationMinutes * 60000);
+    }
   }
 }
 
@@ -334,8 +629,8 @@ function renderHistory() {
   shown.forEach((h) => {
     const li = document.createElement('li');
     const badge = document.createElement('span');
-    badge.className = 'badge ' + (h.kind === 'video' ? 'video' : 'image');
-    badge.textContent = h.kind === 'video' ? 'ভিডিও' : 'ছবি';
+    badge.className = 'badge ' + (h.kind === 'video' ? 'video' : h.kind === 'gif' ? 'gif' : 'image');
+    badge.textContent = h.kind === 'video' ? 'ভিডিও' : h.kind === 'gif' ? 'GIF' : 'ছবি';
     const nameEl = document.createElement('div');
     nameEl.className = 'file-name';
     nameEl.appendChild(badge);
@@ -384,6 +679,81 @@ $('btnPause').addEventListener('click', pauseRecording);
 $('btnResume').addEventListener('click', resumeRecording);
 $('btnStop').addEventListener('click', stopRecording);
 $('btnScreenshot').addEventListener('click', takeScreenshot);
+$('btnGif').addEventListener('click', exportGif);
+$('toolPen').addEventListener('click', () => annSetTool('pen'));
+$('toolArrow').addEventListener('click', () => annSetTool('arrow'));
+$('toolText').addEventListener('click', () => annSetTool('text'));
+$('annUndo').addEventListener('click', () => {
+  const prev = annUndoStack.pop();
+  if (prev) annRedrawFrom(prev);
+});
+$('annSave').addEventListener('click', saveAnnotatedShot);
+$('annCancel').addEventListener('click', () => $('annotatePanel').classList.add('hidden'));
+(function () {
+  const canvas = $('annotateCanvas');
+  function redrawWithPreview(pts) {
+    if (annSnapshot) annRedrawFrom(annSnapshot, () => annDrawStroke(pts, true));
+  }
+  canvas.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    canvas.setPointerCapture(ev.pointerId);
+    const pos = annPos(ev);
+    if (annTool === 'text') {
+      const text = window.prompt('ছবিতে বসানোর টেক্সট লিখুন:');
+      if (text) {
+        annPushUndo();
+        annCtx.fillStyle = $('annColor').value;
+        annCtx.font = `bold ${Math.max(14, +$('annWidth').value * 8)}px sans-serif`;
+        annCtx.fillText(text, pos[0], pos[1]);
+      }
+      return;
+    }
+    annDrawing = true;
+    annPoints = [pos];
+    annSnapshot = canvas.toDataURL('image/png');
+  });
+  canvas.addEventListener('pointermove', (ev) => {
+    if (!annDrawing) return;
+    annPoints.push(annPos(ev));
+    redrawWithPreview(annPoints);
+  });
+  function endStroke(ev) {
+    if (!annDrawing) return;
+    annDrawing = false;
+    annPoints.push(annPos(ev));
+    if (annSnapshot) annRedrawFrom(annSnapshot, () => annDrawStroke(annPoints, false));
+    annPoints = [];
+    annSnapshot = null;
+  }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', () => {
+    annDrawing = false;
+    annPoints = [];
+    annSnapshot = null;
+  });
+})();
+// v1.1.0 — scheduled recording controls
+$('schedSaveBtn').addEventListener('click', () => {
+  const time = $('schedTime').value;
+  const durationMinutes = +$('schedDur').value;
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    alert('সময় সঠিক নয় — HH:MM ফরম্যাটে লিখুন (যেমন 09:00)।');
+    return;
+  }
+  if (Number.isNaN(durationMinutes) || durationMinutes < 0 || durationMinutes > 480) {
+    alert('সময়কাল ০–৪৮০ মিনিটের মধ্যে হতে হবে।');
+    return;
+  }
+  persistSchedule({
+    time,
+    durationMinutes,
+    enabled: $('schedEnable').checked,
+  });
+  setStatus('⏰ সময়সূচি সংরক্ষিত হয়েছে', false);
+});
+$('schedEnable').addEventListener('change', () => {
+  persistSchedule({ enabled: $('schedEnable').checked });
+});
 $('btnUpdate').addEventListener('click', runUpdateCheck);
 $('btnTray').addEventListener('click', () => window.ghostRecorder.minimizeToTray());
 $('btnQuit').addEventListener('click', () => window.ghostRecorder.quitApp());
@@ -402,6 +772,18 @@ window.ghostRecorder.onUpdateResult((result) => showUpdate(result));
     const v = await window.ghostRecorder.getAppVersion();
     if (v) $('appVersion').textContent = `v${v}`;
   } catch (_err) { /* keep default label */ }
+  // v1.1.0 — load the persisted schedule, then check it every 5s.
+  try {
+    const saved = await window.ghostRecorder.getSchedule();
+    if (saved && typeof saved === 'object') {
+      state.schedule = { ...state.schedule, ...saved };
+      $('schedTime').value = state.schedule.time;
+      $('schedDur').value = state.schedule.durationMinutes;
+      $('schedEnable').checked = state.schedule.enabled;
+    }
+  } catch (_err) { /* schedule stays at defaults */ }
+  refreshSchedStatus();
+  state.schedTimerId = setInterval(checkSchedule, 5000);
   updateButtons();
   renderHistory();
   await loadSources();

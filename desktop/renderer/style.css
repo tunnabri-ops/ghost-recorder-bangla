@@ -99,9 +99,41 @@ body {
 .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 12px; margin-right: 6px; }
 .badge.video { background: #7c3aed; }
 .badge.image { background: #0369a1; }
+.badge.gif { background: #b45309; }
 .count { color: var(--muted); font-size: 13px; }
 .footer {
   display: flex; justify-content: space-between; padding: 10px 20px;
   color: var(--muted); font-size: 13px; border-top: 1px solid var(--border);
 }
 .muted { color: var(--muted); }
+
+/* ---------- v1.1.0: webcam overlay ---------- */
+#compositePreview { width: 100%; aspect-ratio: 16 / 9; display: block; background: #000; }
+.cam-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-size: 14px; }
+.cam-row label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.cam-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+.cam-row select, .sched-row select {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 8px; font-family: inherit; font-size: 14px;
+}
+#camNote { flex-basis: 100%; }
+
+/* ---------- v1.1.0: annotation editor ---------- */
+.annotate-panel { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: var(--panel-2); }
+.annotate-panel h3 { margin: 0 0 10px; font-size: 15px; }
+.annotate-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.annotate-tools .tool-btn.active { background: var(--accent); color: #082f49; border-color: var(--accent); font-weight: 700; }
+.annotate-tools input[type="color"] { width: 42px; height: 34px; padding: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.annotate-tools input[type="range"] { accent-color: var(--accent); }
+#annotateCanvas { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; background: #000; cursor: crosshair; touch-action: none; }
+
+/* ---------- v1.1.0: scheduled recording ---------- */
+.sched-panel { margin: 0 20px 16px; }
+.sched-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 10px; font-size: 14px; }
+.sched-row label { display: flex; gap: 6px; align-items: center; }
+.sched-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+.sched-row input[type="time"], .sched-row input[type="number"] {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; font-family: inherit; font-size: 14px;
+}
+.sched-row input[type="number"] { width: 80px; }
